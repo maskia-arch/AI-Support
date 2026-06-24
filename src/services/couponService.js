@@ -150,9 +150,8 @@ const couponService = {
     const weekday   = jsDay === 0 ? 6 : jsDay - 1;            // → 0=Mo...6=So
     let discount    = settings.coupon_discount    || 10;
     let type        = settings.coupon_type         || 'percentage';
-    let description = settings.coupon_description  || `${discount}% Rabatt auf alle Produkte`;
+    let description = settings.coupon_description  || (type === 'percentage' ? `${discount}% Rabatt` : `${discount}€ Rabatt`);
     let maxUses     = settings.coupon_max_uses      || null;
-    let dayEnabled  = true;
 
     try {
       const { data: schedule } = await supabase
@@ -166,9 +165,10 @@ const couponService = {
           logger.info(`[Coupon] Wochentag ${weekday} deaktiviert – kein Coupon heute`);
           return null;
         }
-        discount    = schedule.discount    || discount;
-        type        = schedule.type        || type;
-        description = schedule.description || description;
+        discount    = schedule.discount;
+        type        = schedule.type;
+        // Wochentag-Beschreibung: falls leer, passend zum Rabatt generieren um Mismatch zu vermeiden
+        description = schedule.description || (type === 'percentage' ? `${discount}% Rabatt` : `${discount}€ Rabatt`);
         maxUses     = schedule.max_uses    || null;
         logger.info(`[Coupon] Wochentag ${weekday}: ${discount}${type==='percentage'?'%':'€'} – ${description}`);
       }
@@ -180,10 +180,8 @@ const couponService = {
     const prefix = type === 'percentage' ? `SAVE${discount}` : `EUR${discount}`;
     const code   = this._generateCode(prefix);
 
-    // Sellauth Regel: expiration_date MUSS nach heute liegen (nicht heute selbst!)
-    // → Wir schicken morgen an Sellauth, löschen aber beim nächsten Coupon aktiv
-    // Effektive Laufzeit: heute (wird um 00:00 durch neuen Coupon ersetzt)
     const today    = new Date();
+    const todayDate = today.toISOString().slice(0, 10); // YYYY-MM-DD
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const expiresDate = tomorrow.toISOString().slice(0, 10); // YYYY-MM-DD (morgen → Sellauth-Pflicht)
@@ -205,6 +203,7 @@ const couponService = {
         global:           true,
         discount:         discount,
         type:             type,
+        start_date:       todayDate,
         expiration_date:  expiresDate,   // Heute – läuft heute Nacht ab
         disable_if_volume_discount: false
       };
@@ -219,13 +218,19 @@ const couponService = {
       logger.error(`[Coupon] Sellauth-Fehler: ${e.response?.data?.message || e.message}`);
     }
 
+    // Falls die Coupon-Erstellung in Sellauth fehlschlägt, den Coupon nicht in der DB speichern
+    if (!sellauthId) {
+      logger.error(`[Coupon] Coupon-Erstellung in Sellauth fehlgeschlagen – breche ab, nicht in DB gespeichert`);
+      return null;
+    }
+
     // 3. In DB speichern (echte Schema-Spalten!)
     const { data: saved, error: saveErr } = await supabase.from('daily_coupons').insert([{
       code,
       discount_value: discount,
       discount_type:  type,
       description,
-      sellauth_id:    String(sellauthId || ''),
+      sellauth_id:    String(sellauthId),
       active_until:   expiresAt.toISOString(),
       max_uses:       maxUses,
       is_active:      true,
@@ -234,10 +239,9 @@ const couponService = {
 
     if (saveErr) {
       logger.error(`[Coupon] DB-Save fehlgeschlagen: ${saveErr.message}`);
-      // Coupon existiert in Sellauth, aber DB-Save schlug fehl → trotzdem Objekt zurückgeben
       return {
         code, discount_value: discount, discount_type: type, description,
-        sellauth_id: String(sellauthId || ''), active_until: expiresAt.toISOString(),
+        sellauth_id: String(sellauthId), active_until: expiresAt.toISOString(),
         is_active: true, uses: 0, _db_save_failed: true
       };
     }
