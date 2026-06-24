@@ -45,13 +45,19 @@ const couponService = {
       if (process.env.SELLAUTH_API_KEY)  result.sellauth_api_key  = process.env.SELLAUTH_API_KEY;
       if (process.env.SELLAUTH_SHOP_ID)  result.sellauth_shop_id  = process.env.SELLAUTH_SHOP_ID;
       if (process.env.SELLAUTH_SHOP_URL) result.sellauth_shop_url = process.env.SELLAUTH_SHOP_URL;
+
+      // Leerzeichen/Newlines abschneiden, um Fehler bei der Authentifizierung zu vermeiden
+      if (result.sellauth_api_key)  result.sellauth_api_key  = String(result.sellauth_api_key).trim();
+      if (result.sellauth_shop_id)  result.sellauth_shop_id  = String(result.sellauth_shop_id).trim();
+      if (result.sellauth_shop_url) result.sellauth_shop_url = String(result.sellauth_shop_url).trim();
+
       return result;
     } catch {
       // Auch im Fehlerfall ENV-Vars zurückgeben
       return {
-        sellauth_api_key:  process.env.SELLAUTH_API_KEY  || '',
-        sellauth_shop_id:  process.env.SELLAUTH_SHOP_ID  || '',
-        sellauth_shop_url: process.env.SELLAUTH_SHOP_URL || '',
+        sellauth_api_key:  (process.env.SELLAUTH_API_KEY  || '').trim(),
+        sellauth_shop_id:  (process.env.SELLAUTH_SHOP_ID  || '').trim(),
+        sellauth_shop_url: (process.env.SELLAUTH_SHOP_URL || '').trim(),
       };
     }
   },
@@ -141,8 +147,9 @@ const couponService = {
     }
 
     if (!settings.sellauth_api_key || !settings.sellauth_shop_id) {
-      logger.warn('[Coupon] Sellauth nicht konfiguriert (API Key / Shop ID fehlt)');
-      return null;
+      const msg = 'Sellauth nicht konfiguriert (API Key / Shop ID fehlt in env oder DB)';
+      logger.warn(`[Coupon] ${msg}`);
+      throw new Error(msg);
     }
 
     // Wochentag-Planung prüfen (0=Mo ... 6=So, JS: 0=So → umrechnen)
@@ -197,6 +204,7 @@ const couponService = {
 
     // 2. Neuen Coupon in Sellauth erstellen
     let sellauthId = null;
+    let apiErrorMsg = null;
     try {
       const body = {
         code,
@@ -215,13 +223,13 @@ const couponService = {
       sellauthId = created?.id || null;
       logger.info(`[Coupon] Sellauth erstellt: ${code} (ID: ${sellauthId}, läuft ab: ${expiresDate})`);
     } catch (e) {
-      logger.error(`[Coupon] Sellauth-Fehler: ${e.response?.data?.message || e.message}`);
+      apiErrorMsg = e.response?.data?.message || e.response?.data?.error || e.message;
+      logger.error(`[Coupon] Sellauth-Fehler: ${apiErrorMsg}`);
     }
 
     // Falls die Coupon-Erstellung in Sellauth fehlschlägt, den Coupon nicht in der DB speichern
     if (!sellauthId) {
-      logger.error(`[Coupon] Coupon-Erstellung in Sellauth fehlgeschlagen – breche ab, nicht in DB gespeichert`);
-      return null;
+      throw new Error(apiErrorMsg || 'API-Antwort enthielt keine gültige ID');
     }
 
     // 3. In DB speichern (echte Schema-Spalten!)

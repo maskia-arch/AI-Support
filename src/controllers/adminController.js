@@ -20,9 +20,9 @@ const jwt = require('jsonwebtoken');
 /** Sellauth-Credentials: ENV > DB */
 function getEffectiveSellauth(dbSettings) {
   return {
-    apiKey:  process.env.SELLAUTH_API_KEY  || dbSettings?.sellauth_api_key  || '',
-    shopId:  process.env.SELLAUTH_SHOP_ID  || dbSettings?.sellauth_shop_id  || '',
-    shopUrl: process.env.SELLAUTH_SHOP_URL || dbSettings?.sellauth_shop_url || '',
+    apiKey:  (process.env.SELLAUTH_API_KEY  || dbSettings?.sellauth_api_key  || '').trim(),
+    shopId:  (process.env.SELLAUTH_SHOP_ID  || dbSettings?.sellauth_shop_id  || '').trim(),
+    shopUrl: (process.env.SELLAUTH_SHOP_URL || dbSettings?.sellauth_shop_url || '').trim(),
   };
 }
 
@@ -635,9 +635,13 @@ const adminController = {
       const couponService = require('../services/couponService');
       // force=true: Coupon manuell erstellen, auch wenn coupon_enabled=false in Settings
       const coupon = await couponService.createDailyCoupon(true);
-      if (!coupon) return res.status(400).json({ error: 'Coupon konnte nicht erstellt werden. Sellauth API Key / Shop ID prüfen (Env-Vars: SELLAUTH_API_KEY, SELLAUTH_SHOP_ID).' });
+      if (!coupon) {
+        return res.status(400).json({ error: 'Coupon konnte nicht erstellt werden. Sellauth Konfiguration prüfen.' });
+      }
       res.json({ success: true, coupon });
-    } catch (e) { next(e); }
+    } catch (e) {
+      res.status(400).json({ error: `Coupon konnte nicht erstellt werden: ${e.message}` });
+    }
   },
 
   async getCouponHistory(req, res, next) {
