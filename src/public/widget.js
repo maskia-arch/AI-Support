@@ -90,89 +90,98 @@ function smartTitle(){
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 var CSS=[
-'#vs25 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}',
-// Bubble – 63px (5% larger than 60px)
-'#vs25-bbl{position:fixed;bottom:24px;right:22px;z-index:99998;width:63px;height:63px;border-radius:50%;background:linear-gradient(145deg,#025c4c,#128c7e);box-shadow:0 4px 20px rgba(2,92,76,.5);cursor:pointer;border:none;outline:none;display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s}',
-'#vs25-bbl:hover{transform:scale(1.07)}',
-'#vs25-bbl svg{width:30px;height:30px;fill:white}',
+'#vs25 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}',
+// Bubble
+'#vs25-bbl{position:fixed;bottom:24px;right:22px;z-index:99998;width:60px;height:60px;border-radius:50%;background:#25d366;box-shadow:0 4px 16px rgba(37,211,102,0.4);cursor:pointer;border:none;outline:none;display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s}',
+'#vs25-bbl:hover{transform:scale(1.06)}',
+'#vs25-bbl svg{width:28px;height:28px;fill:white}',
 // Status dot on bubble
-'#vs25-status-dot{position:absolute;bottom:3px;right:3px;width:14px;height:14px;border-radius:50%;border:2.5px solid white;background:#4caf50;transition:background .3s}',
-'#vs25-status-dot.online{background:#4caf50;box-shadow:0 0 0 3px rgba(76,175,80,.3);animation:vspulse 2s infinite}',
-'#vs25-status-dot.manual{background:#ff9800;box-shadow:0 0 0 3px rgba(255,152,0,.3);animation:vspulse 2s infinite}',
+'#vs25-status-dot{position:absolute;bottom:2px;right:2px;width:13px;height:13px;border-radius:50%;border:2px solid white;background:#4caf50;}',
+'#vs25-status-dot.online{background:#25d366;box-shadow:0 0 0 2px rgba(37,211,102,.3);animation:vspulse 2s infinite}',
+'#vs25-status-dot.manual{background:#ff9800;box-shadow:0 0 0 2px rgba(255,152,0,.3);animation:vspulse 2s infinite}',
 '#vs25-status-dot.offline{background:#f44336;animation:none}',
 '@keyframes vspulse{0%,100%{opacity:1}50%{opacity:.55}}',
 // Proactive invite bubble
-'#vs25-inv{position:fixed;bottom:100px;right:22px;z-index:99997;background:white;color:#111;border-radius:12px 12px 2px 12px;padding:11px 32px 11px 13px;max-width:230px;box-shadow:0 2px 16px rgba(0,0,0,.2);font-size:.84rem;line-height:1.4;cursor:pointer;display:none;animation:vspop .3s ease-out}',
+'#vs25-inv{position:fixed;bottom:96px;right:22px;z-index:99997;background:white;color:#111b21;border-radius:12px 12px 2px 12px;padding:10px 28px 10px 14px;max-width:240px;box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:.85rem;line-height:1.4;cursor:pointer;display:none;animation:vspop .3s ease-out}',
 '#vs25-inv.on{display:block}#vs25-inv::after{content:"";position:absolute;bottom:-6px;right:16px;border-left:6px solid transparent;border-top:6px solid white}',
-'.vs25-ix{position:absolute;top:4px;right:7px;font-size:.7rem;color:#999;cursor:pointer;background:none;border:none;line-height:1}',
+'.vs25-ix{position:absolute;top:4px;right:6px;font-size:.75rem;color:#8696a0;cursor:pointer;background:none;border:none;line-height:1}',
 '@keyframes vspop{from{opacity:0;transform:scale(.88) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}',
-// Panel
-'#vs25-pnl{position:fixed;z-index:99999;display:none;flex-direction:column;bottom:0;right:0;width:100%;height:88%;border-radius:16px 16px 0 0;overflow:hidden;background:#ece5dd;transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}',
+// Panel - always portrait hochformat
+'#vs25-pnl{position:fixed;z-index:99999;display:none;flex-direction:column;bottom:0;right:0;width:100%;height:100%;overflow:hidden;background:#efeae2;box-shadow:0 8px 32px rgba(11,20,26,0.2);transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}',
 '#vs25-pnl.on{display:flex;transform:translateY(0)}',
-'@media(min-width:540px){#vs25-pnl{bottom:96px;right:20px;width:390px;height:620px;border-radius:16px;transform:none;transition:none}}',
-'@media(min-width:540px) #vs25-pnl.on{display:flex}',
-// Drag handle
-'.vs25-drag{display:none;justify-content:center;padding:10px 0 4px;background:#128c7e;flex-shrink:0}',
-'.vs25-drag span{width:32px;height:4px;border-radius:2px;background:rgba(255,255,255,.4)}',
+// Force portrait on desktop screen
+'@media(min-width:540px){',
+'  #vs25-pnl{bottom:90px;right:24px;width:375px;height:620px;border-radius:12px;border:1px solid rgba(11,20,26,0.08);transform:none;transition:none}',
+'  #vs25-pnl.on{display:flex}',
+'}',
+// Drag handle on mobile
+'.vs25-drag{display:none;justify-content:center;padding:8px 0 4px;background:#008069;flex-shrink:0}',
+'.vs25-drag span{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.35)}',
 '@media(max-width:539px){.vs25-drag{display:flex}}',
-// Header – WhatsApp dark green
-'.vs25-hdr{background:#075e54;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}',
-'.vs25-hdr-av{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;position:relative}',
-'.vs25-hdr-av .vs25-av-dot{position:absolute;bottom:1px;right:1px;width:11px;height:11px;border-radius:50%;border:2px solid #075e54;background:#4caf50}',
+// Header - WhatsApp Green
+'.vs25-hdr{background:#008069;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.15)}',
+'.vs25-back{background:none;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;margin-right:2px;transition:opacity .15s;flex-shrink:0}',
+'.vs25-back:hover{opacity:.8}',
+'.vs25-back svg{width:22px;height:22px;fill:white}',
+'.vs25-hdr-av{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;position:relative}',
+'.vs25-hdr-av .vs25-av-dot{position:absolute;bottom:0px;right:0px;width:9px;height:9px;border-radius:50%;border:1.5px solid #008069;background:#25d366}',
 '.vs25-hdr-av .vs25-av-dot.manual{background:#ff9800}',
 '.vs25-hdr-av .vs25-av-dot.offline{background:#f44336}',
 '.vs25-hdr-info{flex:1;min-width:0}',
-'.vs25-hdr-name{color:white;font-weight:700;font-size:.95rem;line-height:1.2;letter-spacing:.1px}',
-'.vs25-hdr-sub{color:rgba(255,255,255,.78);font-size:.72rem;margin-top:2px}',
+'.vs25-hdr-name{color:white;font-weight:700;font-size:.92rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+'.vs25-hdr-sub{color:rgba(255,255,255,.85);font-size:.72rem;margin-top:2px}',
 // KI Toggle in header
-'.vs25-toggle-wrap{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-right:14px}',
-'.vs25-toggle-label{color:rgba(255,255,255,.8);font-size:.72rem;font-weight:600}',
-'.vs25-toggle{position:relative;width:38px;height:20px;cursor:pointer;flex-shrink:0}',
+'.vs25-toggle-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0;margin-right:8px}',
+'.vs25-toggle-label{color:rgba(255,255,255,.9);font-size:.7rem;font-weight:600}',
+'.vs25-toggle{position:relative;width:34px;height:18px;cursor:pointer;flex-shrink:0}',
 '.vs25-toggle input{opacity:0;width:0;height:0;position:absolute}',
-'.vs25-slider{position:absolute;inset:0;background:#aaa;border-radius:20px;transition:.3s;cursor:pointer}',
-'.vs25-slider::before{content:"";position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s}',
+'.vs25-slider{position:absolute;inset:0;background:rgba(255,255,255,.3);border-radius:18px;transition:.2s;cursor:pointer}',
+'.vs25-slider::before{content:"";position:absolute;height:12px;width:12px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s}',
 '.vs25-toggle input:checked + .vs25-slider{background:#25d366}',
-'.vs25-toggle input:checked + .vs25-slider::before{transform:translateX(18px)}',
-// Close button - Windows style
-'.vs25-cls{width:28px;height:28px;border-radius:4px;background:none;border:none;color:rgba(255,255,255,.75);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;transition:all .15s;flex-shrink:0}',
-'.vs25-cls:hover{background:#e81123;color:white;border-radius:3px}',
-// Messages area – WhatsApp beige
-'.vs25-msgs{flex:1;overflow-y:auto;padding:10px 10px 6px;display:flex;flex-direction:column;gap:2px;background:#ece5dd;background-image:url("data:image/svg+xml,%3Csvg width=\'200\' height=\'200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3C/svg%3E")}',
+'.vs25-toggle input:checked + .vs25-slider::before{transform:translateX(16px)}',
+// Messages area - WhatsApp light background with subtle doodle pattern
+'.vs25-msgs{flex:1;overflow-y:auto;padding:14px 14px 8px;display:flex;flex-direction:column;gap:6px;background-color:#efeae2;background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'80\' height=\'80\' viewBox=\'0 0 80 80\'%3E%3Cg fill=\'%23e5ddd5\' fill-opacity=\'0.3\'%3E%3Cpath d=\'M10 15h2v2h-2zm10 5h2v2h-2zm-10 15h2v2h-2zm20-10h2v2h-2zm10-10h2v2h-2zm10 20h2v2h-2zm10 10h2v2h-2zm-30 20h2v2h-2zm-10 10h2v2h-2zm20 10h2v2h-2zm10-10h2v2h-2zm10-10h2v2h-2zm10 20h2v2h-2zm10 10h2v2h-2z\'/%3E%3C/g%3E%3C/svg%3E")}',
 '.vs25-msgs::-webkit-scrollbar{width:4px}.vs25-msgs::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:2px}',
-'.vs25-msg{display:flex;flex-direction:column;max-width:80%;margin-bottom:1px}',
+'.vs25-msg{display:flex;flex-direction:column;max-width:85%;margin-bottom:6px}',
 '.vs25-msg.u{align-self:flex-end}',
 '.vs25-msg.b{align-self:flex-start}',
-// WhatsApp-style bubbles — modernisiert, Timestamp immer lesbar dank padding-right Reserve
-'.vs25-bub{padding:7px 12px;border-radius:12px;font-size:.92rem;line-height:1.45;word-break:break-word;white-space:pre-wrap;position:relative;min-height:34px;box-shadow:0 1px 1.5px rgba(0,0,0,.13)}',
-'.vs25-msg.b .vs25-bub{background:#ffffff;color:#111b21;border-top-left-radius:4px;padding-right:62px}',
-'.vs25-msg.u .vs25-bub{background:#d9fdd3;color:#111b21;border-top-right-radius:4px;padding-right:62px}',
-// Timestamp innerhalb der Bubble (WhatsApp-Position, immer lesbar dank padding-right Reserve)
-'.vs25-ts{position:absolute;bottom:6px;right:10px;font-size:.66rem;color:rgba(0,0,0,.45);font-weight:500;white-space:nowrap;line-height:1;letter-spacing:.2px}',
-'.vs25-msg.u .vs25-ts{color:rgba(0,0,0,.45)}',
+// WhatsApp bubbles with tails
+'.vs25-bub{padding:6px 10px;font-size:.92rem;line-height:1.45;word-break:break-word;white-space:pre-wrap;position:relative;min-height:32px;box-shadow:0 1px 0.5px rgba(0,0,0,.13);padding-right:60px}',
+'.vs25-msg.b .vs25-bub{background:#ffffff;color:#111b21;border-radius:0 8px 8px 8px}',
+'.vs25-msg.u .vs25-bub{background:#d9fdd3;color:#111b21;border-radius:8px 0 8px 8px}',
+// Timestamp inside bubble
+'.vs25-ts{position:absolute;bottom:4px;right:8px;font-size:.66rem;color:#8696a0;display:flex;align-items:center;gap:3px;line-height:1}',
+'.vs25-ticks{color:#53bdeb;font-size:0.75rem;font-weight:bold;margin-left:2px}',
 // Date separator
-'.vs25-date-sep{text-align:center;margin:8px 0;font-size:.72rem;color:rgba(0,0,0,.55)}',
-'.vs25-date-sep span{background:rgba(255,255,255,.65);padding:3px 10px;border-radius:8px}',
-// Typing
-'.vs25-typ .vs25-bub{display:flex;align-items:center;gap:4px;padding:12px 16px;min-width:60px}',
-'.vs25-typ span{width:8px;height:8px;border-radius:50%;background:#aaa;animation:vsb 1.3s infinite}',
+'.vs25-date-sep{text-align:center;margin:6px 0;font-size:.7rem;color:#667781}',
+'.vs25-date-sep span{background:#ffffff;padding:4px 12px;border-radius:8px;box-shadow:0 1px 0.5px rgba(0,0,0,.13)}',
+// Typing indicator
+'.vs25-typ .vs25-bub{display:flex;align-items:center;gap:4px;padding:10px 14px;min-width:54px}',
+'.vs25-typ span{width:6px;height:6px;border-radius:50%;background:#8696a0;animation:vsb 1.3s infinite}',
 '.vs25-typ span:nth-child(2){animation-delay:.2s}.vs25-typ span:nth-child(3){animation-delay:.4s}',
-'@keyframes vsb{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}',
-// FAQ Grid – all visible, tap-friendly rectangles
-'.vs25-fq{padding:8px 10px 4px;background:#f0f0f0;border-top:1px solid #ddd;flex-shrink:0}',
-'.vs25-fqg{display:flex;flex-wrap:wrap;gap:5px}',
-'.vs25-chip{background:white;border:1px solid #128c7e;color:#075e54;font-size:.78rem;font-weight:600;padding:7px 10px;border-radius:6px;cursor:pointer;line-height:1.3;transition:background .15s;text-align:left;min-width:0;flex:0 1 calc(50% - 3px)}',
-'.vs25-chip:hover{background:#e7f5f3}',
-'.vs25-chip:active{background:#d0ede8}',
+'@keyframes vsb{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}',
+// Suggestions (FAQ) Area - horizontally scrollable, attractive, modern look
+'.vs25-fq{padding:6px 8px;background:transparent;flex-shrink:0;overflow:hidden}',
+'.vs25-fqg{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:4px 2px}',
+'.vs25-fqg::-webkit-scrollbar{display:none}',
+'.vs25-chip{background:white;border:1px solid #25d366;color:#128c7e;font-size:.78rem;font-weight:600;padding:8px 14px;border-radius:18px;cursor:pointer;line-height:1.2;transition:all .18s ease;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,0.06);white-space:nowrap;flex-shrink:0}',
+'.vs25-chip:hover{background:#25d366;color:white;border-color:#25d366;transform:translateY(-1px)}',
+'.vs25-chip:active{transform:translateY(0)}',
 // Input area
-'.vs25-ir{padding:10px 10px;background:#f0f0f0;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;border-top:1px solid #ddd}',
-'.vs25-inp{flex:1;background:white;border:none;color:#111b21;border-radius:24px;padding:11px 16px;font-size:.94rem;font-family:inherit;resize:none;max-height:110px;overflow-y:auto;line-height:1.45;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.08)}',
-'.vs25-snd{width:44px;height:44px;border-radius:50%;flex-shrink:0;background:#128c7e;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s;font-size:1.15rem;box-shadow:0 2px 6px rgba(18,140,126,.35)}',
-'.vs25-snd:hover{background:#075e54}',
-'.vs25-snd:active{transform:scale(.95)}',
-'.vs25-snd:disabled{background:#ccc;cursor:not-allowed;box-shadow:none;transform:none}',
-'.vs25-ft{text-align:center;padding:5px 4px;color:#888;font-size:.62rem;background:#f0f0f0;flex-shrink:0}',
-// Mobile: Eingabe + Footer höher anheben (Android Gesten-Navigation / iOS Safe-Area)
-'@media(max-width:539px){.vs25-ir{padding-top:14px;padding-bottom:14px}.vs25-ft{padding-bottom:calc(10px + env(safe-area-inset-bottom))}}'
+'.vs25-ir{padding:8px 10px;background:#f0f2f5;display:flex;gap:6px;align-items:center;flex-shrink:0;border-top:1px solid rgba(0,0,0,0.05)}',
+'.vs25-inp{flex:1;background:white;border:none;color:#111b21;border-radius:20px;padding:9px 15px;font-size:0.92rem;font-family:inherit;resize:none;max-height:100px;overflow-y:auto;line-height:1.4;outline:none;box-shadow:0 1px 2px rgba(0,0,0,0.1)}',
+'.vs25-snd{width:38px;height:38px;border-radius:50%;flex-shrink:0;background:#00a884;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s;box-shadow:0 1px 3px rgba(0,0,0,0.2)}',
+'.vs25-snd:hover{background:#008f72}',
+'.vs25-snd:active{transform:scale(.92)}',
+'.vs25-snd svg{width:18px;height:18px;fill:white}',
+'.vs25-snd:disabled{background:#a6b9bc;cursor:not-allowed;box-shadow:none;transform:none}',
+'.vs25-ft{text-align:center;padding:4px;color:#8696a0;font-size:.62rem;background:#f0f2f5;flex-shrink:0}',
+// Mobile optimizations
+'@media(max-width:539px){',
+'  #vs25-pnl{bottom:0;right:0;width:100%;height:100%;border-radius:0}',
+'  .vs25-ir{padding-bottom:calc(8px + env(safe-area-inset-bottom))}',
+'  .vs25-ft{padding-bottom:calc(6px + env(safe-area-inset-bottom))}',
+'}'
 ].join('');
 
 var INVITES=['💬 Fragen zur eSIM? Ich helfe sofort!','🤔 Noch unsicher? Kostenlose Beratung!','👋 Passende eSIM finden – frag mich!','🔍 Ich finde den richtigen Tarif für dich!'];
@@ -192,6 +201,7 @@ function build(){
     '<div id="vs25-pnl">'+
       '<div class="vs25-drag"><span></span></div>'+
       '<div class="vs25-hdr">'+
+        '<button class="vs25-back" id="vs25-back" title="Schließen" aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>'+
         '<div class="vs25-hdr-av">🤖<span class="vs25-av-dot" id="vs25-av-dot"></span></div>'+
         '<div class="vs25-hdr-info">'+
           '<div class="vs25-hdr-name">ValueShop25 Support</div>'+
@@ -201,13 +211,12 @@ function build(){
           '<span class="vs25-toggle-label">KI</span>'+
           '<label class="vs25-toggle"><input type="checkbox" id="vs25-ki-toggle" checked><span class="vs25-slider"></span></label>'+
         '</div>'+
-        '<button class="vs25-cls" id="vs25-cls" title="Schließen" aria-label="Schließen">✕</button>'+
       '</div>'+
       '<div class="vs25-msgs" id="vs25-msgs"></div>'+
       '<div class="vs25-fq" id="vs25-fq"><div class="vs25-fqg" id="vs25-fqg"></div></div>'+
       '<div class="vs25-ir">'+
-        '<textarea class="vs25-inp" id="vs25-inp" placeholder="Nachricht…" rows="1"></textarea>'+
-        '<button class="vs25-snd" id="vs25-snd" aria-label="Senden"><svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>'+
+        '<textarea class="vs25-inp" id="vs25-inp" placeholder="Nachricht schreiben…" rows="1"></textarea>'+
+        '<button class="vs25-snd" id="vs25-snd" aria-label="Senden"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>'+
       '</div>'+
       '<div class="vs25-ft"><span id="vs25-ft-text">Powered by ValueShop25 AI</span></div>'+
     '</div>';
@@ -215,7 +224,7 @@ function build(){
   document.body.appendChild(w);
 
   document.getElementById('vs25-bbl').onclick=openChat;
-  document.getElementById('vs25-cls').onclick=closeChat;
+  document.getElementById('vs25-back').onclick=closeChat;
   document.getElementById('vs25-snd').onclick=sendMsg;
   document.getElementById('vs25-ki-toggle').onchange=toggleKI;
   document.getElementById('vs25-inv').onclick=function(e){if(e.target.id==='vs25-ix'){hideInv();return;}hideInv();openChat();};
@@ -249,6 +258,10 @@ function startSession(){
   _safeFetch(API+'/api/widget/config').then(function(r){return r.json();}).then(function(d){
     var ft=document.getElementById('vs25-ft-text');
     if(ft){if(d.poweredBy===null||d.poweredBy===''){ft.parentElement.style.display='none';}else if(d.poweredBy){ft.textContent=d.poweredBy;}}
+    if(d.botName){
+      var nameEl = document.querySelector('.vs25-hdr-name');
+      if (nameEl) nameEl.textContent = d.botName;
+    }
   }).catch(function(){});
 
   var saved=_ssGet();
@@ -390,7 +403,8 @@ function addMsg(role,text,noScroll){
   var el=document.getElementById('vs25-msgs'); if(!el) return;
   var d=document.createElement('div'); d.className='vs25-msg '+role;
   var t=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-  d.innerHTML='<div class="vs25-bub">'+esc(text)+'<span class="vs25-ts">'+t+'</span></div>';
+  var ticks = role === 'u' ? '<span class="vs25-ticks">✓✓</span>' : '';
+  d.innerHTML='<div class="vs25-bub">'+esc(text)+'<span class="vs25-ts">'+t+ticks+'</span></div>';
   el.appendChild(d); if(!noScroll) scrl();
 }
 
