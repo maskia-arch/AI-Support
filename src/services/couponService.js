@@ -197,6 +197,13 @@ const couponService = {
     const expiresAt = new Date(today);
     expiresAt.setHours(23, 59, 59, 0);
 
+    const keySource = process.env.SELLAUTH_API_KEY ? 'ENV' : (settings.sellauth_api_key ? 'DB' : 'none');
+    const maskedKey = settings.sellauth_api_key 
+      ? `${settings.sellauth_api_key.substring(0, 4)}... (Länge: ${settings.sellauth_api_key.length})` 
+      : 'fehlt';
+    const shopIdSource = process.env.SELLAUTH_SHOP_ID ? 'ENV' : (settings.sellauth_shop_id ? 'DB' : 'none');
+    logger.info(`[Coupon] Verwende Sellauth API-Key aus ${keySource}: ${maskedKey}`);
+    logger.info(`[Coupon] Verwende Sellauth Shop-ID aus ${shopIdSource}: ${settings.sellauth_shop_id}`);
     logger.info(`[Coupon] Erstelle: ${code} (${discount}${type === 'percentage' ? '%' : '€'} Rabatt, Sellauth-Ablauf: ${expiresDate})`);
 
     // 1. Alten Coupon ZUERST in Sellauth löschen (vor dem neuen erstellen)
