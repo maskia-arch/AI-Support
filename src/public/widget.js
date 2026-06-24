@@ -143,11 +143,14 @@ var CSS = [
 '.vs25-ix{position:absolute;top:4px;right:6px;font-size:.75rem;color:#8696a0;cursor:pointer;background:none;border:none;line-height:1}',
 '@keyframes vspop{from{opacity:0;transform:scale(.88) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}',
 // Panel (mobile first – full screen)
-'#vs25-pnl{position:fixed;z-index:99999;display:none;flex-direction:column;top:0;left:0;width:100%;height:100%;height:100dvh;border-radius:0;overflow:hidden;background:var(--pnl-bg);box-shadow:0 8px 32px rgba(11,20,26,.2);transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}',
+// Use 100svh (small viewport = excludes browser chrome bars) so widget never overflows.
+// Fallback chain: 100svh → 100dvh → 100% for broadest browser support.
+'#vs25-pnl{position:fixed;z-index:99999;display:none;flex-direction:column;top:0;left:0;width:100%;height:100%;height:100svh;max-height:100svh;border-radius:0;overflow:hidden;background:var(--pnl-bg);box-shadow:0 8px 32px rgba(11,20,26,.2);transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}',
+'@supports(height:100dvh) and (not (height:100svh)){#vs25-pnl{height:100dvh;max-height:100dvh}}',
 '#vs25-pnl.on{display:flex;transform:translateY(0)}',
 // Desktop: portrait container
 '@media(min-width:540px){',
-'  #vs25-pnl{top:auto;bottom:90px;right:24px;left:auto;width:375px;height:620px;border-radius:12px;border:1px solid rgba(11,20,26,.08);transform:translateY(120%)}',
+'  #vs25-pnl{top:auto;bottom:90px;right:24px;left:auto;width:370px;height:min(620px,calc(100svh - 110px));border-radius:12px;border:1px solid rgba(11,20,26,.08);transform:translateY(120%)}',
 '  #vs25-pnl.on{display:flex;transform:translateY(0)}',
 '}',
 // Mobile drag handle
@@ -211,27 +214,42 @@ var CSS = [
 '.vs25-typ span{width:6px;height:6px;border-radius:50%;background:#8696a0;animation:vsb 1.3s infinite}',
 '.vs25-typ span:nth-child(2){animation-delay:.2s}.vs25-typ span:nth-child(3){animation-delay:.4s}',
 '@keyframes vsb{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}',
-// FAQ suggestion chips
-'.vs25-fq{padding:8px 12px 6px;background:transparent;flex-shrink:0;overflow:hidden}',
-'.vs25-fqg{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:4px 2px}',
-'.vs25-fqg::-webkit-scrollbar{display:none}',
-'.vs25-chip{background:var(--chip-bg);border:var(--chip-bd);color:var(--chip-c);font-size:.83rem;font-weight:600;padding:10px 18px;border-radius:22px;cursor:pointer;line-height:1.2;transition:all .18s ease;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.08);white-space:nowrap;flex-shrink:0}',
-'.vs25-chip:hover{background:var(--chip-hbg);color:var(--chip-hc);border-color:var(--chip-hbg);transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,.12)}',
+// FAQ suggestion chips – compact wrapping grid, always fully visible
+'.vs25-fq{padding:6px 10px 4px;background:var(--bar-bg);flex-shrink:0;border-top:1px solid rgba(0,0,0,.06);box-shadow:0 -1px 4px rgba(0,0,0,.04)}',
+'.vs25-fqg{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0}',
+'.vs25-chip{',
+'  display:inline-flex;align-items:center;gap:5px;',
+'  background:var(--chip-bg);',
+'  border:none;',
+'  color:var(--chip-c);',
+'  font-size:.78rem;font-weight:600;',
+'  padding:7px 13px;',
+'  border-radius:6px;',
+'  cursor:pointer;line-height:1.2;',
+'  transition:background .15s,color .15s,transform .1s;',
+'  text-align:left;',
+'  box-shadow:0 1px 3px rgba(0,0,0,.1);',
+'  white-space:nowrap;flex-shrink:0;',
+'  border-left:3px solid var(--chip-c)',
+'}',
+'.vs25-chip:hover{background:var(--chip-hbg);color:var(--chip-hc);border-left-color:var(--chip-hbg);transform:translateY(-1px)}',
 '.vs25-chip:active{transform:translateY(0)}',
 // Input area
-'.vs25-ir{padding:8px 10px;background:var(--bar-bg);display:flex;gap:6px;align-items:center;flex-shrink:0;border-top:1px solid rgba(0,0,0,.05);transition:background .3s}',
-'.vs25-inp{flex:1;background:var(--inp-bg);color:var(--inp-c);border:none;border-radius:20px;padding:10px 16px;font-size:.92rem;font-family:inherit;resize:none;max-height:100px;overflow-y:auto;line-height:1.4;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.1);transition:background .3s,color .3s}',
+'.vs25-ir{padding:7px 10px;background:var(--bar-bg);display:flex;gap:6px;align-items:center;flex-shrink:0;border-top:1px solid rgba(0,0,0,.05);transition:background .3s}',
+'.vs25-inp{flex:1;background:var(--inp-bg);color:var(--inp-c);border:none;border-radius:20px;padding:9px 14px;font-size:.9rem;font-family:inherit;resize:none;max-height:80px;overflow-y:auto;line-height:1.4;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.1);transition:background .3s,color .3s}',
 '.vs25-inp::placeholder{color:var(--ts-c)}',
-'.vs25-snd{width:42px;height:42px;border-radius:50%;flex-shrink:0;background:#00a884;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s;box-shadow:0 2px 6px rgba(0,0,0,.2)}',
+'.vs25-snd{width:40px;height:40px;border-radius:50%;flex-shrink:0;background:#00a884;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s;box-shadow:0 2px 6px rgba(0,0,0,.2)}',
 '.vs25-snd:hover{background:#008f72}',
 '.vs25-snd:active{transform:scale(.92)}',
-'.vs25-snd svg{width:20px;height:20px;fill:white}',
+'.vs25-snd svg{width:19px;height:19px;fill:white}',
 '.vs25-snd:disabled{background:#a6b9bc;cursor:not-allowed;box-shadow:none;transform:none}',
-'.vs25-ft{text-align:center;padding:4px;color:var(--ft-c);font-size:.62rem;background:var(--bar-bg);flex-shrink:0;transition:background .3s}',
-// Mobile safe area
+// Footer branding – very compact
+'.vs25-ft{text-align:center;padding:3px 4px;color:var(--ft-c);font-size:.58rem;background:var(--bar-bg);flex-shrink:0;transition:background .3s}',
+// Mobile safe area – push content up above browser nav bar
 '@media(max-width:539px){',
-'  .vs25-ft{padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}',
-'  .vs25-ir.vs25-is-last{padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}',
+'  .vs25-ft{padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))}',
+'  .vs25-ir{padding-bottom:calc(7px + env(safe-area-inset-bottom,0px))}',
+'  .vs25-ir.vs25-is-last{padding-bottom:calc(9px + env(safe-area-inset-bottom,0px))}',
 '}'
 ].join('');
 
