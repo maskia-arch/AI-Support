@@ -142,16 +142,8 @@ const visitorService = {
   async lookupIp(ip) {
     const ipHash = this._hashIp(ip);
     
-    const [visitorRes, activitiesRes, blacklistRes, chatsRes] = await Promise.all([
+    const [visitorRes, blacklistRes, chatsRes] = await Promise.all([
       supabase.from('widget_visitors').select('*').eq('ip_hash', ipHash).maybeSingle(),
-      supabase.from('visitor_activities')
-      .select('*')
-      .eq('chat_id',
-        supabase.from('widget_visitors').select('chat_id').eq('ip_hash', ipHash).limit(1)
-      )
-      .order('created_at', { ascending: false })
-      .limit(50)
-      .catch(() => ({ data: [] })),
       supabase.from('blacklist').select('*').eq('ip_hash', ipHash).maybeSingle(),
       supabase.from('chats').select('*').eq('visitor_ip', ip).order('updated_at', { ascending: false }).limit(20).then(r => r, () => ({ data: [] }))
     ]);
@@ -166,7 +158,8 @@ const visitorService = {
         .select('*')
         .eq('chat_id', visitor.chat_id)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(50)
+        .then(r => r, () => ({ data: [] }));
       activities = acts || [];
     }
     

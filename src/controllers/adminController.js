@@ -52,6 +52,28 @@ function mergeEnvIntoSettings(data) {
   return result;
 }
 
+/**
+ * Hilfsfunktion zum Abrufen aller Daten unter Umgehung des PostgREST-Limits von 1000 Zeilen.
+ */
+async function fetchAll(tableName, selectStr, filterFn = null) {
+  let allData = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    let query = supabase.from(tableName).select(selectStr);
+    if (filterFn) {
+      query = filterFn(query);
+    }
+    const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < pageSize) break;
+    page++;
+  }
+  return allData;
+}
+
 const adminController = {
 
   async login(req, res, next) {
@@ -72,13 +94,13 @@ const adminController = {
         { count: activeManual },
         { count: totalKnowledge },
         { count: pendingLearning },
-        { data: tokenUsage }
+        tokenUsage
       ] = await Promise.all([
         supabase.from('chats').select('*', { count: 'exact', head: true }),
         supabase.from('chats').select('*', { count: 'exact', head: true }).eq('is_manual_mode', true),
         supabase.from('knowledge_base').select('*', { count: 'exact', head: true }),
         supabase.from('learning_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('messages').select('prompt_tokens, completion_tokens')
+        fetchAll('messages', 'prompt_tokens, completion_tokens, embedding_tokens')
       ]);
       const tin   = (tokenUsage||[]).reduce((s,m) => s+(m.prompt_tokens||0), 0);
       const tout  = (tokenUsage||[]).reduce((s,m) => s+(m.completion_tokens||0), 0);
@@ -408,15 +430,11 @@ const adminController = {
       const days  = range === 'month' ? 30 : 7;
       const since = new Date(Date.now() - (is24h ? 86400000 : days * 86400000)).toISOString();
 
-      const [sessionsRes, chatsRes, activitiesRes] = await Promise.all([
-        supabase.from('visitor_sessions').select('started_at').gte('started_at', since),
-        supabase.from('chats').select('created_at, platform').gte('created_at', since),
-        supabase.from('visitor_activities').select('created_at').gte('created_at', since)
+      const [sessions, chats, activities] = await Promise.all([
+        fetchAll('visitor_sessions', 'started_at', q => q.gte('started_at', since)),
+        fetchAll('chats', 'created_at, platform', q => q.gte('created_at', since)),
+        fetchAll('visitor_activities', 'created_at', q => q.gte('created_at', since))
       ]);
-
-      const sessions   = sessionsRes.data   || [];
-      const chats      = chatsRes.data       || [];
-      const activities = activitiesRes.data  || [];
 
       const buckets = {};
       if (is24h) {
@@ -445,7 +463,10 @@ const adminController = {
         range,
         days: Object.values(buckets),
         totals: {
-          sessions: sessions.length, chats: chats.length, pageviews: activities.length,
+          visitors: sessions.length,
+          sessions: sessions.length,
+          chats: chats.length,
+          pageviews: activities.length,
           widgetChats: chats.filter(ch=>ch.platform==='web_widget').length,
           telegramChats: chats.filter(ch=>ch.platform==='telegram').length
         }
