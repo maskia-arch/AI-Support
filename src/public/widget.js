@@ -106,20 +106,20 @@ var CSS=[
 '#vs25-inv.on{display:block}#vs25-inv::after{content:"";position:absolute;bottom:-6px;right:16px;border-left:6px solid transparent;border-top:6px solid white}',
 '.vs25-ix{position:absolute;top:4px;right:6px;font-size:.75rem;color:#8696a0;cursor:pointer;background:none;border:none;line-height:1}',
 '@keyframes vspop{from{opacity:0;transform:scale(.88) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}',
-// Panel - always portrait hochformat
-'#vs25-pnl{position:fixed;z-index:99999;display:none;flex-direction:column;bottom:0;right:0;width:100%;height:100%;overflow:hidden;background:#efeae2;box-shadow:0 8px 32px rgba(11,20,26,0.2);transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}',
+// Panel - always portrait hochformat (mobile first)
+'#vs25-pnl{position:fixed;z-index:99999;display:none;flex-direction:column;top:0;left:0;width:100%;height:100%;height:100dvh;border-radius:0;overflow:hidden;background:#efeae2;box-shadow:0 8px 32px rgba(11,20,26,0.2);transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}',
 '#vs25-pnl.on{display:flex;transform:translateY(0)}',
 // Force portrait on desktop screen
 '@media(min-width:540px){',
-'  #vs25-pnl{bottom:90px;right:24px;width:375px;height:620px;border-radius:12px;border:1px solid rgba(11,20,26,0.08);transform:none;transition:none}',
-'  #vs25-pnl.on{display:flex}',
+'  #vs25-pnl{top:auto;bottom:90px;right:24px;left:auto;width:375px;height:620px;border-radius:12px;border:1px solid rgba(11,20,26,0.08);transform:translateY(120%)}',
+'  #vs25-pnl.on{display:flex;transform:translateY(0)}',
 '}',
 // Drag handle on mobile
 '.vs25-drag{display:none;justify-content:center;padding:8px 0 4px;background:#008069;flex-shrink:0}',
 '.vs25-drag span{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.35)}',
 '@media(max-width:539px){.vs25-drag{display:flex}}',
 // Header - WhatsApp Green
-'.vs25-hdr{background:#008069;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.15)}',
+'.vs25-hdr{background:#008069;padding:calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.15)}',
 '.vs25-back{background:none;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;margin-right:2px;transition:opacity .15s;flex-shrink:0}',
 '.vs25-back:hover{opacity:.8}',
 '.vs25-back svg{width:22px;height:22px;fill:white}',
@@ -146,11 +146,11 @@ var CSS=[
 '.vs25-msg.u{align-self:flex-end}',
 '.vs25-msg.b{align-self:flex-start}',
 // WhatsApp bubbles with tails
-'.vs25-bub{padding:6px 10px;font-size:.92rem;line-height:1.45;word-break:break-word;white-space:pre-wrap;position:relative;min-height:32px;box-shadow:0 1px 0.5px rgba(0,0,0,.13);padding-right:60px}',
+'.vs25-bub{padding:8px 12px;font-size:.92rem;line-height:1.45;word-break:break-word;white-space:pre-wrap;position:relative;min-height:32px;box-shadow:0 1px 0.5px rgba(0,0,0,.13);padding-right:66px}',
 '.vs25-msg.b .vs25-bub{background:#ffffff;color:#111b21;border-radius:0 8px 8px 8px}',
 '.vs25-msg.u .vs25-bub{background:#d9fdd3;color:#111b21;border-radius:8px 0 8px 8px}',
 // Timestamp inside bubble
-'.vs25-ts{position:absolute;bottom:4px;right:8px;font-size:.66rem;color:#8696a0;display:flex;align-items:center;gap:3px;line-height:1}',
+'.vs25-ts{position:absolute;bottom:5px;right:10px;font-size:.66rem;color:#8696a0;display:flex;align-items:center;gap:3px;line-height:1}',
 '.vs25-ticks{color:#53bdeb;font-size:0.75rem;font-weight:bold;margin-left:2px}',
 // Date separator
 '.vs25-date-sep{text-align:center;margin:6px 0;font-size:.7rem;color:#667781}',
@@ -178,9 +178,8 @@ var CSS=[
 '.vs25-ft{text-align:center;padding:4px;color:#8696a0;font-size:.62rem;background:#f0f2f5;flex-shrink:0}',
 // Mobile optimizations
 '@media(max-width:539px){',
-'  #vs25-pnl{bottom:0;right:0;width:100%;height:100%;border-radius:0}',
-'  .vs25-ir{padding-bottom:calc(8px + env(safe-area-inset-bottom))}',
-'  .vs25-ft{padding-bottom:calc(6px + env(safe-area-inset-bottom))}',
+'  .vs25-ft{padding-bottom:calc(6px + env(safe-area-inset-bottom, 0px))}',
+'  .vs25-ir.vs25-is-last{padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px))}',
 '}'
 ].join('');
 
@@ -257,7 +256,15 @@ function passiveTrack(){
 function startSession(){
   _safeFetch(API+'/api/widget/config').then(function(r){return r.json();}).then(function(d){
     var ft=document.getElementById('vs25-ft-text');
-    if(ft){if(d.poweredBy===null||d.poweredBy===''){ft.parentElement.style.display='none';}else if(d.poweredBy){ft.textContent=d.poweredBy;}}
+    if(ft){
+      if(d.poweredBy===null||d.poweredBy===''){
+        ft.parentElement.style.display='none';
+        var ir = document.querySelector('.vs25-ir');
+        if(ir) ir.classList.add('vs25-is-last');
+      }else if(d.poweredBy){
+        ft.textContent=d.poweredBy;
+      }
+    }
     if(d.botName){
       var nameEl = document.querySelector('.vs25-hdr-name');
       if (nameEl) nameEl.textContent = d.botName;
