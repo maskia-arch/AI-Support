@@ -43,23 +43,31 @@
         </div>
 
         <nav class="sidebar-nav">
-            <button class="nav-btn" onclick="showSection('chats')" id="nav-chats">
-                <span class="nav-icon">💬</span>
-                <span class="nav-text">Chats</span>
-                <span id="learning-badge" class="badge" style="display:none;">0</span>
-            </button>
+            <!-- Monitoring Group -->
+            <div class="nav-category">Monitoring</div>
             <button class="nav-btn" onclick="showSection('traffic')" id="nav-traffic">
                 <span class="nav-icon">📊</span>
-                <span class="nav-text">Traffic</span>
+                <span class="nav-text">Dashboard</span>
+            </button>
+            <button class="nav-btn" onclick="showSection('chats')" id="nav-chats">
+                <span class="nav-icon">💬</span>
+                <span class="nav-text">Live-Chats</span>
+                <span id="learning-badge" class="badge" style="display:none;">0</span>
+            </button>
+
+            <!-- AI Management Group -->
+            <div class="nav-category">KI-Steuerung</div>
+            <button class="nav-btn" onclick="showSection('knowledge')" id="nav-knowledge">
+                <span class="nav-icon">📚</span>
+                <span class="nav-text">Wissensbasis</span>
             </button>
             <button class="nav-btn" onclick="showSection('learning')" id="nav-learning">
                 <span class="nav-icon">🧠</span>
-                <span class="nav-text">Lernen</span>
+                <span class="nav-text">AI-Training</span>
             </button>
-            <button class="nav-btn" onclick="showSection('knowledge')" id="nav-knowledge">
-                <span class="nav-icon">📚</span>
-                <span class="nav-text">Wissen</span>
-            </button>
+
+            <!-- Configuration & System Group -->
+            <div class="nav-category">System</div>
             <button class="nav-btn" onclick="showSection('sellauth')" id="nav-sellauth">
                 <span class="nav-icon">🛒</span>
                 <span class="nav-text">Sellauth</span>
@@ -324,26 +332,11 @@
         <!-- ══ SETTINGS ════════════════════════════════════════════════════ -->
         <section id="settings-section" class="app-section">
             <h2 class="section-title">⚙️ Einstellungen</h2>
-            <!-- ══ Folder Tabs ══════════════════════════════════════════════ -->
-            <div class="settings-folder-nav">
-              <!-- eSIM-Berater Tabs -->
-              <div class="settings-folder" id="folder-berater">
-                <div class="folder-tabs" id="folder-tabs-berater">
-                  <button class="tab-btn active" id="stab-bot"         onclick="showSettingsTab('bot',this)">🤖 Bot</button>
-                  <button class="tab-btn"         id="stab-model"       onclick="showSettingsTab('model',this)">🔬 Modell</button>
-                  <button class="tab-btn"         id="stab-widget"      onclick="showSettingsTab('widget-cfg',this)">🔗 Widget</button>
-                  <button class="tab-btn"         id="stab-coupon"      onclick="showSettingsTab('coupon-cfg',this)">🎟️ Coupon</button>
-                </div>
-              </div>
-
-              <!-- Admin-Helper Tabs -->
-              <div class="settings-folder" id="folder-adminhelper">
-                <div class="folder-tabs" id="folder-tabs-adminhelper">
-                  <button class="tab-btn" id="stab-channels"    onclick="showSettingsTab('channel-cfg',this)">📢 Channels</button>
-                  <button class="tab-btn" id="stab-userinfo"    onclick="showSettingsTab('userinfo-cfg',this)">🔍 UserInfo Pro</button>
-                  <button class="tab-btn" id="stab-pakete"      onclick="showSettingsTab('pakete-cfg',this)">📦 Pakete & Refills</button>
-                </div>
-              </div>
+            <div class="folder-tabs" id="folder-tabs-berater">
+              <button class="tab-btn active" id="stab-bot"         onclick="showSettingsTab('bot',this)">🤖 Bot</button>
+              <button class="tab-btn"         id="stab-model"       onclick="showSettingsTab('model',this)">🔬 Modell</button>
+              <button class="tab-btn"         id="stab-widget"      onclick="showSettingsTab('widget-cfg',this)">🔗 Widget</button>
+              <button class="tab-btn"         id="stab-coupon"      onclick="showSettingsTab('coupon-cfg',this)">🎟️ Coupon</button>
             </div>
 
             <div id="settings-tab-bot" class="tab-pane active">
@@ -531,204 +524,7 @@
                     </div>
                     <button onclick="saveWeekSchedule()" class="btn btn-success btn-full" style="margin-top:12px;">💾 Wochenplan speichern</button>
                 </div>
-</div><!-- /settings-tab-coupon-cfg -->
-
-                <!-- Channel Settings -->
-                <div id="settings-tab-channel-cfg" class="tab-pane">
-                  <div class="card">
-                    <h3 class="card-title">📢 Channel Bot</h3>
-                    <p style="font-size:0.8rem;color:#888;margin-bottom:12px;">Channels & Gruppen wo der Bot als Admin hinzugefügt wurde. Bot erkennt sich automatisch beim Hinzufügen.</p>
-                    <div id="channel-list"><p style="color:#555;font-size:0.85rem;">Lädt…</p></div>
-                    <button onclick="scanAndLoadChannels()" class="btn btn-secondary btn-sm" style="margin-top:8px;">🔍 Scannen &amp; Aktualisieren</button>
-                  </div>
-                  <div class="card" style="margin-top:12px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                      <h3 class="card-title" style="margin:0;">🔗 Channel-Gruppen</h3>
-                      <button onclick="createChannelGroupUI()" class="btn btn-secondary btn-sm">+ Neu</button>
-                    </div>
-                    <p style="font-size:0.78rem;color:#888;margin-bottom:8px;">Verknüpfte Channels teilen Datenbank und System-Prompt.</p>
-                    <div id="channel-groups-list"><p style="color:#555;font-size:0.85rem;">Lädt…</p></div>
-                  </div>
-                  <div style="display:none">
-                  </div>
-                </div>
-
-                <div id="settings-tab-userinfo-cfg" class="tab-pane">
-                  <div class="card">
-                    <h3 class="card-title">🔍 UserInfo Pro</h3>
-                    <p style="font-size:0.8rem;color:#888;margin-bottom:12px;">Nutzer mit unbegrenzten UserInfo-Abfragen. Kostenlose User: 5 Abfragen/Tag bot-übergreifend.</p>
-                    <div class="form-group">
-                      <label>Telegram ID *</label>
-                      <input type="number" id="ui-pro-id" placeholder="z.B. 123456789" style="width:100%;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;margin-bottom:6px;">
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                      <input type="text" id="ui-pro-username" placeholder="@username (optional)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      <input type="text" id="ui-pro-note" placeholder="Notiz / Kundennummer" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                    </div>
-                    <input type="date" id="ui-pro-expires" style="width:100%;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;margin-bottom:10px;" title="Ablaufdatum (leer = unbegrenzt)">
-<div class="card" style="display:none;margin-top:12px;">
-                    <h3 class="card-title">📦 Channel-Pakete</h3>
-                    <p style="font-size:0.8rem;color:#888;margin-bottom:12px;">Credits und Preise für Channel-Upgrades festlegen. Channel Admins kaufen ein Paket für ihren Channel.</p>
-                    <div style="background:#0d1117;border:1px solid #1e3a5f;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.78rem;">
-                      <div style="color:#60a5fa;font-weight:700;margin-bottom:4px;">📡 Sellauth Webhook URL</div>
-                      <div style="font-family:monospace;color:#94a3b8;word-break:break-all;" id="webhook-url-display-DEPRECATED">Lädt…</div>
-                      <div style="color:#555;margin-top:4px;">In Sellauth → Settings → Webhooks → diese URL eintragen</div>
-                    </div>
-                    <div id="packages-list-DEPRECATED"><p style="color:#555;font-size:0.85rem;">Lädt…</p></div>
-                    <div id="package-edit-form-DEPRECATED" style="margin-top:12px;display:none;">
-                      <input type="hidden" id="pkg-id-DEPRECATED">
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text"   id="pkg-name-DEPRECATED"    placeholder="Name (z.B. Starter)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="number" id="pkg-price-DEPRECATED"   placeholder="Preis (€)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="number" id="pkg-credits-DEPRECATED" placeholder="Credits" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text"   id="pkg-desc"    placeholder="Beschreibung" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text" id="pkg-product-id" placeholder="Sellauth Product-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text" id="pkg-variant-id"  placeholder="Sellauth Variant-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <input type="number" id="pkg-days" value="30" placeholder="Laufzeit in Tagen" style="width:100%;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;margin-bottom:8px;">
-                      </div>
-                      <div style="display:flex;gap:8px;">
-                        <button onclick="savePackage()" class="btn btn-success btn-sm" style="flex:1;">💾 Speichern</button>
-                        <button onclick="hidePackageForm()" class="btn btn-secondary btn-sm">Abbrechen</button>
-                      </div>
-                    </div>
-                    <button onclick="showPackageForm()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:10px;">➕ Paket anlegen</button>
-
-                  <div class="card" style="display:none;margin-top:12px;">
-                    <h3 class="card-title">🔋 Refill-Optionen</h3>
-                    <p style="font-size:0.8rem;color:#888;margin-bottom:10px;">Credit-Nachladung ohne Laufzeitverlängerung. Nutzbar wenn Credits erschöpft sind.</p>
-                    <div id="refills-list-DEPRECATED"><p style="color:#555;font-size:0.85rem;">Lädt…</p></div>
-                    <div id="refill-edit-form-DEPRECATED" style="margin-top:12px;display:none;">
-                      <input type="hidden" id="rf-id-DEPRECATED">
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text"   id="rf-name-DEPRECATED"       placeholder="Name (z.B. 1.000 Credits)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="number" id="rf-price"      placeholder="Preis (€)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="number" id="rf-credits"    placeholder="Credits" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text"   id="rf-desc"       placeholder="Beschreibung (optional)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text" id="rf-product-id" placeholder="Sellauth Product-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text" id="rf-variant-id"  placeholder="Sellauth Variant-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:flex;gap:8px;">
-                        <button onclick="saveRefill()" class="btn btn-success btn-sm" style="flex:1;">💾 Speichern</button>
-                        <button onclick="hideRefillForm()" class="btn btn-secondary btn-sm">Abbrechen</button>
-                      </div>
-                    </div>
-                    <button onclick="showRefillForm()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:10px;">➕ Refill anlegen</button>
-                  </div>
-                  </div>
-                </div>
-                  </div>
-                <div id="settings-tab-pakete-cfg" class="tab-pane" style="padding:12px;">
-
-                  <!-- Channel-Verwaltung -->
-                  <div class="card" style="margin-bottom:12px;">
-                    <h3 class="card-title">🛠 Channel-Verwaltung</h3>
-                    <p style="font-size:0.8rem;color:#888;margin-bottom:10px;">Credits manuell vergeben, Pakete buchen oder Laufzeit anpassen.</p>
-                    <div id="channel-admin-list-pkg"><p style="color:#555;font-size:0.85rem;">Lädt…</p></div>
-                    <div id="ch-edit-form-pkg" style="display:none;margin-top:12px;background:#0d1117;border:1px solid #1e3a5f;border-radius:6px;padding:12px;">
-                      <div style="font-weight:700;color:#60a5fa;margin-bottom:8px;">✏️ <span id="ch-edit-name-pkg"></span></div>
-                      <input type="hidden" id="ch-edit-id-pkg">
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="number" id="ch-edit-credits-pkg" placeholder="Neues Credit-Limit" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="date" id="ch-edit-expires-pkg" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:flex;gap:12px;margin-bottom:8px;font-size:0.82rem;">
-                        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="ch-edit-ai-pkg"> KI aktiviert</label>
-                        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="ch-edit-reset-pkg"> Verbrauch zurücksetzen</label>
-                      </div>
-                      <div style="display:flex;gap:8px;">
-                        <button onclick="saveChannelEditPkg()" class="btn btn-success btn-sm" style="flex:1;">💾 Speichern</button>
-                        <button onclick="document.getElementById('ch-edit-form-pkg').style.display='none'" class="btn btn-secondary btn-sm">Abbrechen</button>
-                      </div>
-                    </div>
-                    <div id="ch-pkg-form-pkg" style="display:none;margin-top:12px;background:#0d1117;border:1px solid #14532d;border-radius:6px;padding:12px;">
-                      <div style="font-weight:700;color:#4ade80;margin-bottom:8px;">📦 Paket buchen für <span id="ch-pkg-name-pkg"></span></div>
-                      <input type="hidden" id="ch-pkg-id-pkg">
-                      <select id="ch-pkg-select-pkg" style="width:100%;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;margin-bottom:8px;"></select>
-                      <div style="display:flex;gap:8px;">
-                        <button onclick="savePackageBookPkg()" class="btn btn-success btn-sm" style="flex:1;">✅ Manuell buchen</button>
-                        <button onclick="document.getElementById('ch-pkg-form-pkg').style.display='none'" class="btn btn-secondary btn-sm">Abbrechen</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Channel-Pakete -->
-                  <div class="card" style="margin-bottom:12px;">
-                    <h3 class="card-title">📦 Channel-Pakete</h3>
-                    <p style="font-size:0.8rem;color:#888;margin-bottom:10px;">Sellauth Checkout-Pakete. Benötigt Sellauth Business Plan.</p>
-                    <div style="background:#0d1117;border:1px solid #1e3a5f;border-radius:6px;padding:10px;margin-bottom:12px;font-size:0.78rem;">
-                      <div style="color:#60a5fa;font-weight:700;margin-bottom:4px;">📡 Webhook URL</div>
-                      <div style="font-family:monospace;color:#94a3b8;word-break:break-all;" id="webhook-url-display2">Lädt…</div>
-                      <div style="color:#555;margin-top:4px;">Sellauth → Settings → Webhooks → eintragen</div>
-                    </div>
-                    <div id="packages-list-pkg"><p style="color:#555;font-size:0.85rem;">Lädt…</p></div>
-                    <div id="package-edit-form-pkg" style="margin-top:12px;display:none;background:#0d1117;border:1px solid #1e3a5f;border-radius:6px;padding:12px;">
-                      <input type="hidden" id="pkg-id-pkg">
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text"   id="pkg-name-pkg"    placeholder="Name (z.B. Pro)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="number" id="pkg-price-pkg"   placeholder="Preis (€)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="number" id="pkg-credits-pkg" placeholder="Credits" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text"   id="pkg-desc-pkg"    placeholder="Beschreibung" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text" id="pkg-product-id-pkg" placeholder="Sellauth Product-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text" id="pkg-variant-id-pkg"  placeholder="Sellauth Variant-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <input type="number" id="pkg-days-pkg" value="30" placeholder="Laufzeit (Tage)" style="width:100%;padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;margin-bottom:8px;">
-                      <div style="background:#111;border-radius:6px;padding:8px;margin-bottom:8px;">
-                        <div style="font-size:0.75rem;color:#60a5fa;margin-bottom:4px;">🔍 Varianten aus Sellauth laden (Product-ID eingeben + klicken)</div>
-                        <select id="pkg-variant-lookup-pkg" style="width:100%;padding:6px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;"></select>
-                        <button onclick="loadVariantsPkg()" style="width:100%;margin-top:4px;padding:6px;background:#1e3a5f;color:#60a5fa;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">🔄 Varianten laden</button>
-                      </div>
-                      <div style="display:flex;gap:8px;">
-                        <button onclick="savePackagePkg()" class="btn btn-success btn-sm" style="flex:1;">💾 Speichern</button>
-                        <button onclick="hidePackageFormPkg()" class="btn btn-secondary btn-sm">Abbrechen</button>
-                      </div>
-                    </div>
-                    <button onclick="showPackageFormPkg()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:10px;">➕ Paket anlegen</button>
-                  </div>
-
-                  <!-- Refill-Optionen -->
-                  <div class="card">
-                    <h3 class="card-title">🔋 Refill-Optionen</h3>
-                    <p style="font-size:0.8rem;color:#888;margin-bottom:10px;">Credit-Nachladung ohne Laufzeitverlängerung.</p>
-                    <div id="refills-list-pkg"><p style="color:#555;font-size:0.85rem;">Lädt…</p></div>
-                    <div id="refill-edit-form-pkg" style="margin-top:12px;display:none;background:#0d1117;border:1px solid #14532d;border-radius:6px;padding:12px;">
-                      <input type="hidden" id="rf-id-pkg">
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text"   id="rf-name-pkg"       placeholder="Name" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="number" id="rf-price-pkg"      placeholder="Preis (€)" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="number" id="rf-credits-pkg"    placeholder="Credits" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text"   id="rf-desc-pkg"       placeholder="Beschreibung" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                        <input type="text" id="rf-product-id-pkg" placeholder="Product-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                        <input type="text" id="rf-variant-id-pkg"  placeholder="Variant-ID" style="padding:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;">
-                      </div>
-                      <div style="background:#111;border-radius:6px;padding:8px;margin-bottom:8px;">
-                        <div style="font-size:0.75rem;color:#4ade80;margin-bottom:4px;">🔍 Varianten aus Sellauth laden</div>
-                        <select id="rf-variant-lookup-pkg" style="width:100%;padding:6px;background:#1a1a1a;border:1px solid #333;border-radius:6px;color:#e2e8f0;"></select>
-                        <button onclick="loadVariantsRefillPkg()" style="width:100%;margin-top:4px;padding:6px;background:#14532d;color:#4ade80;border:none;border-radius:4px;cursor:pointer;font-size:0.75rem;">🔄 Varianten laden</button>
-                      </div>
-                      <div style="display:flex;gap:8px;">
-                        <button onclick="saveRefillPkg()" class="btn btn-success btn-sm" style="flex:1;">💾 Speichern</button>
-                        <button onclick="hideRefillFormPkg()" class="btn btn-secondary btn-sm">Abbrechen</button>
-                      </div>
-                    </div>
-                    <button onclick="showRefillFormPkg()" class="btn btn-secondary btn-sm" style="width:100%;margin-top:10px;">➕ Refill anlegen</button>
-                  </div>
-                </div>
+            </div><!-- /settings-tab-coupon-cfg -->
         </section>
 
     </div> <!-- /#app-content -->
@@ -743,19 +539,14 @@
     window.__APP_TYPE__ = 'berater';
 
     // Apply the body class name for dynamic styling on load
-    document.body.className = 'app-' + (window.__APP_TYPE__ || 'berater');
+    document.body.className = 'app-berater';
     
     // Set status indicator dot/text based on mode
     function updateModeIndicator() {
         var modeText = document.querySelector('.mode-indicator .mode-text');
         var modeDot = document.querySelector('.mode-indicator .mode-dot');
-        if (window.__APP_TYPE__ === 'adminhelper') {
-            if (modeText) modeText.textContent = 'AdminHelper Mode';
-            if (modeDot) modeDot.style.background = 'var(--purple)';
-        } else {
-            if (modeText) modeText.textContent = 'eSIM-Berater Mode';
-            if (modeDot) modeDot.style.background = 'var(--success)';
-        }
+        if (modeText) modeText.textContent = 'eSIM-Berater Mode';
+        if (modeDot) modeDot.style.background = 'var(--success)';
     }
 
 // Wechsel zu Section + falls Daten noch nicht da: nachladen.
@@ -805,21 +596,12 @@ function showSection(id) {
         }
         if (id === 'settings')  {
             if (typeof loadSettings === 'function') loadSettings();
-            if (typeof loadChannels === 'function') loadChannels();
         }
         if (id === 'sellauth')  {
             if (typeof loadSellauthConfigStatus === 'function') loadSellauthConfigStatus();
             if (typeof loadActiveCoupon  === 'function') loadActiveCoupon();
             if (typeof loadCouponHistory === 'function') loadCouponHistory();
             if (typeof loadWeekSchedule  === 'function') loadWeekSchedule();
-        }
-        if (id === 'channels')  {
-            if (typeof loadChannels         === 'function') loadChannels();
-            if (typeof loadChannelCosts     === 'function') loadChannelCosts();
-            if (typeof loadChannelAdminList === 'function') loadChannelAdminList();
-            if (typeof loadProUsers         === 'function') loadProUsers();
-            if (typeof loadPackages         === 'function') loadPackages();
-            if (typeof loadRefills          === 'function') loadRefills();
         }
     } catch(e) {
         console.warn('[showSection]', id, e.message);
@@ -848,18 +630,6 @@ function showSettingsTab(tab, btn) {
         if (typeof loadActiveCoupon === 'function') loadActiveCoupon();
         if (typeof loadWeekSchedule === 'function') loadWeekSchedule();
     }
-    if (tab === 'channel-cfg') {
-        if (api && api.invalidate) api.invalidate('/channels');
-        if (typeof loadChannels === 'function') loadChannels();
-        // Auto-scan on first open
-        if (typeof scanAndLoadChannels === 'function') setTimeout(scanAndLoadChannels, 500);
-    }
-    if (tab === 'pakete-cfg') {
-        if (typeof _initPaketeTab === 'function') _initPaketeTab();
-    }
-    if (tab === 'userinfo-cfg') {
-        if (typeof loadProUsers === 'function') setTimeout(loadProUsers, 100);
-    }
 }
 
 async function handleLogin() {
@@ -872,18 +642,14 @@ async function handleLogin() {
         var d = await r.json();
         if (r.ok && d.token) {
             localStorage.setItem('admin_token', d.token);
-            document.body.className = 'app-' + (window.__APP_TYPE__ || 'berater');
+            document.body.className = 'app-berater';
             updateModeIndicator();
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('admin-app').style.display     = 'flex';
             if (typeof initDashboard === 'function') initDashboard();
             
-            var startSec = window.__APP_TYPE__ === 'adminhelper' ? 'settings' : 'chats';
+            var startSec = 'traffic';
             showSection(startSec);
-            if (window.__APP_TYPE__ === 'adminhelper') {
-                var firstTabBtn = document.getElementById('stab-channels');
-                if (firstTabBtn) showSettingsTab('channel-cfg', firstTabBtn);
-            }
         } else { err.style.display = 'block'; err.textContent = d.error || 'Zugriff verweigert'; }
     } catch(e) { err.style.display='block'; err.textContent='Verbindung fehlgeschlagen'; }
 }
@@ -891,17 +657,13 @@ async function handleLogin() {
 function handleLogout() { localStorage.removeItem('admin_token'); window.location.reload(); }
 
 if (localStorage.getItem('admin_token')) {
-    document.body.className = 'app-' + (window.__APP_TYPE__ || 'berater');
+    document.body.className = 'app-berater';
     updateModeIndicator();
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('admin-app').style.display     = 'flex';
     
-    var startSec = window.__APP_TYPE__ === 'adminhelper' ? 'settings' : 'chats';
+    var startSec = 'traffic';
     showSection(startSec);
-    if (window.__APP_TYPE__ === 'adminhelper') {
-        var firstTabBtn = document.getElementById('stab-channels');
-        if (firstTabBtn) showSettingsTab('channel-cfg', firstTabBtn);
-    }
     
     setTimeout(function() {
         if (typeof initDashboard === 'function') initDashboard();

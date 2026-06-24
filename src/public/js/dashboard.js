@@ -48,11 +48,10 @@ async function initDashboard() {
     // leere Sections bis zum Tab-Wechsel oder Refresh.
     // Jetzt: Promise.allSettled feuert alle Endpoints sofort gleichzeitig.
     // Render hat keine Probleme mit ~15 parallelen API-Calls.
-    // (1.6.78) App-Type-Filter: AdminHelper laed andere Endpoints als Berater.
-    // window.__APP_TYPE__ wird im index.html-Header gesetzt ('adminhelper' oder 'berater').
-    var appType = window.__APP_TYPE__ || 'berater';
+    // (1.6.78) App-Type-Filter: Berater mode preload jobs.
+    var appType = 'berater';
 
-    var jobsBerater = [
+    var preloadJobs = [
         loadSettings,
         loadLearningQueue,
         loadBlacklist,
@@ -65,18 +64,6 @@ async function initDashboard() {
         loadActivityFeed,
         loadKbCategories
     ];
-
-    var jobsAdminhelper = [
-        loadSettings,
-        loadChannels,
-        loadChannelCosts,
-        loadProUsers,
-        loadPackages,
-        loadRefills,
-        loadChannelAdminList
-    ];
-
-    var preloadJobs = (appType === 'adminhelper') ? jobsAdminhelper : jobsBerater;
 
     // Fire-and-forget — UI ist sofort sichtbar, Daten füllen sich wie sie ankommen
     Promise.allSettled(preloadJobs.map(function(fn) {

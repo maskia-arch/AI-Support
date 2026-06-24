@@ -4,7 +4,7 @@
  * Verarbeitet eingehende Telegram-Updates für den eSIM-Berater Support-Bot.
  *
  * Scope: NUR PrivatChat mit Usern (isPrivate === true).
- * Gruppen/Kanal-Management liegt im separaten AdminHelper-Service.
+ * Gruppen/Kanal-Management gehört zu einem separaten Service.
  *
  * Token:   process.env.TELEGRAM_BOT_TOKEN
  * Webhook: POST /api/webhooks/telegram
@@ -57,7 +57,7 @@ router.post('/telegram', (req, res) => {
       const from     = msg.from;
       const isPrivate = msg.chat?.type === 'private';
 
-      // Scope: nur PrivatChat — Gruppen/Kanäle gehören dem AdminHelper
+      // Scope: nur PrivatChat — Gruppen/Kanäle gehören einem separaten Service
       if (!isPrivate) return;
 
       if (!chatId || !text || !from) return;

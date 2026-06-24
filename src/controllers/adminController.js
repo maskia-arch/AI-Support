@@ -718,7 +718,7 @@ const adminController = {
       const { data: fbRow } = await supabase.from('user_feedbacks').select('*').eq('id', id).maybeSingle();
       if (!fbRow) return res.status(404).json({ error: 'Feedback nicht gefunden' });
 
-      // Status in DB direkt setzen (AdminHelper-Service nicht verfügbar in diesem Service)
+      // Status in DB direkt setzen (Kanal-Verwaltungs-Service nicht verfügbar in diesem Service)
       await supabase.from('user_feedbacks').update({ status: 'approved' }).eq('id', id);
 
       if (fbRow.target_user_id) {
