@@ -64,10 +64,20 @@ function getSmartTitle(url, titleFromBrowser) {
   if (!url) return 'Seite';
   try {
     const path = new URL(url).pathname;
+    // Warenkorb / Cart
+    if (/\/(cart|warenkorb)/i.test(path)) return 'Warenkorb';
+    // Checkout (incl. /checkout/order-received etc.)
+    if (/\/checkout/i.test(path)) {
+      if (/order[-_]?received|thank/i.test(path)) return 'Bestellung abgeschlossen';
+      return 'Checkout';
+    }
+    // Produktseite
     const m = path.match(/\/product\/([^/?#]+)/);
     if (m) return m[1].replace(/-/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+    // Startseite
     if (path === '/' || path === '') return 'Startseite';
-    return path.replace(/^\//, '').replace(/[-\/]/g, ' ');
+    // Alles andere: Pfad leserlich machen
+    return path.replace(/^\//, '').replace(/[-\/]/g, ' ').replace(/\s+/g,' ').trim().substring(0,50) || 'Seite';
   } catch { return 'Seite'; }
 }
 
@@ -138,17 +148,22 @@ router.post('/activity', async (req, res) => {
   setImmediate(async () => {
     try {
       const chatId = req.headers['x-chat-id'] || req.body.chatId;
-      await visitorService.logActivity(chatId, `Besucht: ${req.body.pageTitle}`, req.body.pageUrl, req.body.pageTitle);
+      if (!chatId) return;
 
-      // (1.6.76-2) Activity-Push (throttled)
-      if (chatId) {
-        const notifService = require('../services/notificationService');
-        await notifService.notifyVisitorActivity({
-          chatId,
-          pageTitle: req.body.pageTitle,
-          pageUrl:   req.body.pageUrl
-        });
-      }
+      const rawTitle  = req.body.pageTitle || '';
+      const pageTitle = rawTitle || getSmartTitle(req.body.pageUrl, rawTitle);
+      const pageUrl   = req.body.pageUrl || '';
+
+      // Log the activity
+      await visitorService.logActivity(chatId, `Besucht: ${pageTitle}`, pageUrl, pageTitle);
+
+      // CRITICAL: also update the visitor session so cart/checkout pages appear
+      // in last_page and page_count (live dashboard visibility)
+      await _upsertSession(chatId, pageTitle, supabase, false);
+
+      // Activity push (throttled)
+      const notifService = require('../services/notificationService');
+      await notifService.notifyVisitorActivity({ chatId, pageTitle, pageUrl }).catch(() => {});
     } catch (_) {}
   });
 });

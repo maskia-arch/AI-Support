@@ -430,8 +430,9 @@ const adminController = {
       const days  = range === 'month' ? 30 : 7;
       const since = new Date(Date.now() - (is24h ? 86400000 : days * 86400000)).toISOString();
 
+      // Fetch chat_id so we can deduplicate visitors per day/total
       const [sessions, chats, activities] = await Promise.all([
-        fetchAll('visitor_sessions', 'started_at', q => q.gte('started_at', since)),
+        fetchAll('visitor_sessions', 'chat_id, started_at', q => q.gte('started_at', since)),
         fetchAll('chats', 'created_at, platform', q => q.gte('created_at', since)),
         fetchAll('visitor_activities', 'created_at', q => q.gte('created_at', since))
       ]);
@@ -441,34 +442,43 @@ const adminController = {
         for (let h = 0; h < 24; h++) {
           const dt = new Date(Date.now() - (23-h)*3600000);
           const key = dt.toISOString().slice(0, 13);
-          buckets[key] = { label: dt.getHours()+':00', sessions:0, chats:0, pageviews:0 };
+          buckets[key] = { label: dt.getHours()+':00', sessions:0, uniqueVisitors: new Set(), chats:0, pageviews:0 };
         }
         const hk = dt => new Date(dt).toISOString().slice(0, 13);
-        sessions.forEach(s   => { const k=hk(s.started_at);  if(buckets[k]) buckets[k].sessions++;  });
+        sessions.forEach(s   => { const k=hk(s.started_at);  if(buckets[k]){ buckets[k].sessions++; if(s.chat_id) buckets[k].uniqueVisitors.add(s.chat_id); } });
         chats.forEach(ch     => { const k=hk(ch.created_at); if(buckets[k]) buckets[k].chats++;     });
         activities.forEach(a => { const k=hk(a.created_at);  if(buckets[k]) buckets[k].pageviews++; });
       } else {
         for (let d = 0; d < days; d++) {
           const dt = new Date(Date.now() - (days-1-d)*86400000);
           const key = dt.toISOString().slice(0, 10);
-          buckets[key] = { label: dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}), sessions:0, chats:0, pageviews:0 };
+          buckets[key] = { label: dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}), sessions:0, uniqueVisitors: new Set(), chats:0, pageviews:0 };
         }
         const dk = dt => new Date(dt).toISOString().slice(0, 10);
-        sessions.forEach(s   => { const k=dk(s.started_at);  if(buckets[k]) buckets[k].sessions++;  });
+        sessions.forEach(s   => { const k=dk(s.started_at);  if(buckets[k]){ buckets[k].sessions++; if(s.chat_id) buckets[k].uniqueVisitors.add(s.chat_id); } });
         chats.forEach(ch     => { const k=dk(ch.created_at); if(buckets[k]) buckets[k].chats++;     });
         activities.forEach(a => { const k=dk(a.created_at);  if(buckets[k]) buckets[k].pageviews++; });
       }
 
+      // Deduplicated total: one chatId = one unique visitor, regardless of session count
+      const allUniqueVisitors = new Set(sessions.map(s => s.chat_id).filter(Boolean));
+
       res.json({
         range,
-        days: Object.values(buckets),
+        days: Object.values(buckets).map(b => ({
+          label:    b.label,
+          sessions: b.sessions,
+          visitors: b.uniqueVisitors.size,
+          chats:    b.chats,
+          pageviews:b.pageviews
+        })),
         totals: {
-          visitors: sessions.length,
-          sessions: sessions.length,
-          chats: chats.length,
-          pageviews: activities.length,
-          widgetChats: chats.filter(ch=>ch.platform==='web_widget').length,
-          telegramChats: chats.filter(ch=>ch.platform==='telegram').length
+          visitors:     allUniqueVisitors.size,  // unique (deduplicated)
+          sessions:     sessions.length,         // raw session count
+          chats:        chats.length,
+          pageviews:    activities.length,
+          widgetChats:  chats.filter(ch=>ch.platform==='web_widget').length,
+          telegramChats:chats.filter(ch=>ch.platform==='telegram').length
         }
       });
     } catch (e) { next(e); }

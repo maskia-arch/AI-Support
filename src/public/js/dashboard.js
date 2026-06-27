@@ -2557,8 +2557,9 @@ var _trafficRange = 'week';
 async function loadTraffic(range) {
     range = range || _trafficRange;
     _trafficRange = range;
+    window._trafficRange = range;
 
-    // Toggle button styles — alle 3 Buttons (24h, week, month)
+    // Toggle button styles
     var db = document.getElementById('traffic-btn-24h');
     var wb = document.getElementById('traffic-btn-week');
     var mb = document.getElementById('traffic-btn-month');
@@ -2568,14 +2569,7 @@ async function loadTraffic(range) {
 
     var title = document.getElementById('traffic-chart-title');
     if (title) {
-        // Map deckt ALLE Range-Werte ab — der 24h-Button schickt '24h' (nicht 'day'),
-        // weshalb der 1.6.68-Fix mit nur 'day' im Title-Bereich nicht griff.
-        var rangeLabels = {
-            '24h':  '24 Stunden',
-            'day':  '24 Stunden',
-            'week': '7 Tage',
-            'month':'30 Tage'
-        };
+        var rangeLabels = { '24h': '24 Stunden', 'day': '24 Stunden', 'week': '7 Tage', 'month': '30 Tage' };
         title.textContent = 'Besucher & Chats – ' + (rangeLabels[range] || rangeLabels.week);
     }
 
@@ -2590,10 +2584,10 @@ async function loadTraffic(range) {
         sv('t-wchats',    data.totals?.widgetChats || 0);
         sv('t-tchats',    data.totals?.telegramChats || 0);
 
-        // Chart
+        // Chart — use d.visitors (unique/deduplicated) not d.sessions
         var days      = data.days || [];
         var labels    = days.map(function(d) { return d.label || d.date || ''; });
-        var visitors  = days.map(function(d) { return d.sessions  || 0; });
+        var visitors  = days.map(function(d) { return d.visitors  !== undefined ? d.visitors  : (d.sessions || 0); });
         var chats     = days.map(function(d) { return d.chats     || 0; });
         var pageviews = days.map(function(d) { return d.pageviews || 0; });
 
@@ -2601,6 +2595,19 @@ async function loadTraffic(range) {
     } catch(e) {
         console.warn('[Traffic]', e.message);
     }
+}
+
+async function refreshTrafficAll() {
+    var btn = document.getElementById('traffic-refresh-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Lädt…'; }
+    try {
+        await Promise.all([
+            loadTraffic(_trafficRange || 'week'),
+            loadLiveVisitors(),
+            loadActivityFeed()
+        ]);
+    } catch(e) { console.warn('[refreshTrafficAll]', e.message); }
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Aktualisieren'; }
 }
 
 function drawTrafficChart(labels, visitors, chats, pageviews) {

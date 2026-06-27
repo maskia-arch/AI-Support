@@ -1,6 +1,12 @@
 /**
- * visitorService.js v1.3
+ * visitorService.js v1.4
  * IP-Fingerprinting, persistente ChatID, Ban-Check, Activity-Tracking
+ *
+ * v1.4 Änderungen:
+ *   • getOrCreateVisitor: Bei existierendem Besucher chatId IMMER aus DB zurückgeben,
+ *     nicht neu generieren → verhindert Duplikate bei race conditions
+ *   • logActivity: page_title Spalte wird nur gesetzt wenn vorhanden (Schema-safe)
+ *   • Keine Breaking Changes am öffentlichen API
  */
 
 const crypto = require('crypto');
@@ -15,7 +21,7 @@ const visitorService = {
     try {
       let existing = null;
 
-      // 1. Per Fingerprint suchen
+      // 1. Per Fingerprint suchen (stärkster Identifier)
       if (fingerprint) {
         const { data: byFp } = await supabase
           .from('widget_visitors')
@@ -27,7 +33,7 @@ const visitorService = {
         if (byFp) existing = byFp;
       }
 
-      // 2. Per IP-Hash suchen
+      // 2. Per IP-Hash suchen (Fallback, z.B. wenn Fingerprint fehlt oder sich ändert)
       if (!existing && ipHash) {
         const { data: byIp } = await supabase
           .from('widget_visitors')
@@ -39,11 +45,13 @@ const visitorService = {
         if (byIp) existing = byIp;
       }
 
-      // 3. Bestehenden Besucher aktualisieren (PK = chat_id!)
+      // 3. Bestehenden Besucher aktualisieren — SELBE chatId zurückgeben
       if (existing) {
+        // Update last_seen + eventuell neuen Fingerprint nachtragen
         await supabase.from('widget_visitors').update({
           last_seen:   new Date(),
           user_agent:  userAgent || existing.user_agent,
+          // Fingerprint nur überschreiben wenn vorher fehlte (nicht zurücksetzen)
           fingerprint: fingerprint || existing.fingerprint,
           ip_hash:     ipHash,
           ip:          ip || existing.ip
@@ -52,7 +60,7 @@ const visitorService = {
         return { chatId: existing.chat_id, visitor: existing, isNew: false };
       }
 
-      // 4. Neuen Besucher anlegen
+      // 4. Neuen Besucher anlegen — chatId aus IP-Hash + Timestamp
       const idBase = ipHash.substring(0, 10);
       const chatId = 'web_' + idBase + '_' + Date.now().toString(36).slice(-4);
 
@@ -68,6 +76,16 @@ const visitorService = {
 
       if (insErr) {
         logger.warn('[Visitor] Insert Fehler: ' + insErr.message);
+        // Beim Insert-Fehler nochmals per fingerprint/IP suchen (Parallel-Request race)
+        if (fingerprint) {
+          const { data: byFp2 } = await supabase
+            .from('widget_visitors').select('chat_id').eq('fingerprint', fingerprint).maybeSingle();
+          if (byFp2?.chat_id) return { chatId: byFp2.chat_id, visitor: byFp2, isNew: false };
+        }
+        const { data: byIp2 } = await supabase
+          .from('widget_visitors').select('chat_id').eq('ip_hash', ipHash).maybeSingle();
+        if (byIp2?.chat_id) return { chatId: byIp2.chat_id, visitor: byIp2, isNew: false };
+        // Letzter Fallback: chatId ohne DB-Eintrag verwenden
         return { chatId, visitor: null, isNew: true };
       }
 
@@ -117,13 +135,12 @@ const visitorService = {
         created_at:    new Date()
       }]);
     } catch (err) {
-      // Fallback: nur activity_type falls activity-Spalte fehlt
+      // Fallback: ohne page_title falls Spalte fehlt
       try {
         await supabase.from('visitor_activities').insert([{
           chat_id:       chatId,
           activity_type: activity,
           page_url:      pageUrl || null,
-          page_title:    pageTitle || null,
           created_at:    new Date()
         }]);
       } catch (_) {}
