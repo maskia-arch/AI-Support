@@ -12,6 +12,7 @@ const isPostgres = !!(dbConfig.url && dbConfig.url.startsWith('postgres'));
 
 let pool = null;
 let db = null;
+let hasPgVector = true;
 
 if (isPostgres) {
   logger.info('[DB Setup] Verwende PostgreSQL-Datenbank.');
@@ -372,6 +373,15 @@ function splitSqlStatements(sql) {
 async function initializeDatabase() {
   if (isPostgres) {
     try {
+      // Prüfe, ob pgvector in Postgres unterstützt wird
+      try {
+        const checkVector = await pool.query("SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vector');");
+        hasPgVector = checkVector.rows[0].exists;
+      } catch (e) {
+        hasPgVector = false;
+      }
+      logger.info(`[DB Setup] Postgres pgvector Support: ${hasPgVector ? 'JA' : 'NEIN'}`);
+
       const checkSql = 'SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = \'public\' AND table_name = \'settings\');';
       const res = await pool.query(checkSql);
       const exists = res.rows[0]?.exists;
@@ -379,9 +389,25 @@ async function initializeDatabase() {
         logger.info('[DB Init] Postgres: Tabelle "settings" nicht gefunden. Initialisiere Datenbank...');
         const schemaPath = path.join(__dirname, '../../supabase/schema_full_v2.sql');
         if (fs.existsSync(schemaPath)) {
-          const sql = fs.readFileSync(schemaPath, 'utf8');
+          let sql = fs.readFileSync(schemaPath, 'utf8');
+          
+          // Wenn pgvector fehlt, passen wir das Schema für Vektoren an (speichern als Text)
+          if (!hasPgVector) {
+            logger.info('[DB Init] Postgres: Passe Schema für Betrieb OHNE pgvector an...');
+            sql = sql.replace(/embedding\s+vector\(\d+\)/gi, 'embedding TEXT');
+          }
+
           const statements = splitSqlStatements(sql);
           for (const stmt of statements) {
+            // Überspringe Statements, die pgvector erfordern
+            if (!hasPgVector) {
+              if (stmt.toUpperCase().includes('USING IVFFLAT') || 
+                  stmt.toUpperCase().includes('FUNCTION MATCH_KNOWLEDGE')) {
+                logger.info(`[DB Init] Postgres: Überspringe pgvector-abhängiges Statement: ${stmt.substring(0, 50)}...`);
+                continue;
+              }
+            }
+
             try {
               await pool.query(stmt);
             } catch (stmtErr) {
@@ -444,7 +470,11 @@ const formatValueForDriver = (val) => {
   if (val === undefined) return null;
   if (isPostgres) {
     if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'number') {
-      return '[' + val.join(',') + ']'; // pgvector format
+      if (hasPgVector) {
+        return '[' + val.join(',') + ']'; // pgvector format
+      } else {
+        return JSON.stringify(val); // Text format (JSON array)
+      }
     }
     return val;
   } else {
@@ -833,6 +863,9 @@ class QueryBuilder {
       if (isPostgres) {
         const result = await pool.query(sql, params);
         data = result.rows;
+        if (!hasPgVector) {
+          data = data.map(parseRow);
+        }
 
         if (countEnabled && data.length > 0) {
           if (this.isHead) {
@@ -894,6 +927,45 @@ const supabase = {
 
   async rpc(fnName, params = {}) {
     if (isPostgres) {
+      if (fnName === 'match_knowledge' && !hasPgVector) {
+        try {
+          const queryEmbedding = params.query_embedding;
+          const matchThreshold = params.match_threshold || 0.3;
+          const matchCount = params.match_count || 8;
+
+          const res = await pool.query('SELECT id, title, content, source_url, embedding FROM knowledge_base WHERE is_active = true AND embedding IS NOT NULL;');
+          const rows = res.rows.map(parseRow);
+
+          const results = [];
+          for (const row of rows) {
+            let emb = row.embedding;
+            if (Array.isArray(emb) && emb.length === queryEmbedding.length) {
+              let dotProduct = 0;
+              for (let i = 0; i < queryEmbedding.length; i++) {
+                dotProduct += queryEmbedding[i] * (emb[i] || 0);
+              }
+              const similarity = dotProduct;
+              if (similarity > matchThreshold) {
+                results.push({
+                  id: row.id,
+                  title: row.title,
+                  content: row.content,
+                  source_url: row.source_url,
+                  similarity: similarity
+                });
+              }
+            }
+          }
+
+          results.sort((a, b) => b.similarity - a.similarity);
+          const sliced = results.slice(0, matchCount);
+          return { data: sliced, error: null };
+        } catch (err) {
+          logger.error(`[DB Adapter Postgres RPC Fallback Error] match_knowledge: ${err.message}`);
+          return { data: null, error: err };
+        }
+      }
+
       let sql = '';
       const values = [];
 
