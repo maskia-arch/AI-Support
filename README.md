@@ -1,6 +1,6 @@
-# AI eSIM Berater (Standalone)
+# AI eSIM Berater (Standalone - VPS/Coolify)
 
-Customer-Support-Bot mit Web-Widget und eigenem Admin-Dashboard.
+Customer-Support-Bot mit Web-Widget und eigenem Admin-Dashboard, lauffähig auf dem eigenen VPS via Coolify.
 
 ## Was kann das?
 
@@ -15,7 +15,7 @@ Customer-Support-Bot mit Web-Widget und eigenem Admin-Dashboard.
 ## Architektur
 
 ```
-Berater-Render-Service ──── NEUE Supabase-DB
+Coolify VPS-Service (NodeJS) ──── Lokale PostgreSQL-Datenbank (mit pgvector)
        │
        ├── Telegram-Support-Bot (TELEGRAM_BOT_TOKEN)
        └── /widget.js → Kunden-Website
@@ -23,19 +23,22 @@ Berater-Render-Service ──── NEUE Supabase-DB
 
 ## Erstmal-Setup
 
-### 1. Neue Supabase-Datenbank
+### 1. PostgreSQL-Datenbank in Coolify anlegen
 
-1. Bei [supabase.com](https://supabase.com) neues Projekt erstellen
-2. SQL-Editor oeffnen
-3. Das Script `supabase/INSTALL_berater_v1_6_78.sql` ausfuehren
+1. Erstelle in Coolify ein neues Service-Projekt oder füge eine neue Ressource hinzu: **Database -> PostgreSQL**.
+2. **WICHTIG:** Nutze ein PostgreSQL-Image, das pgvector unterstützt (z. B. `ankane/pgvector`).
+3. Kopiere nach dem Start die interne oder externe Verbindungs-URL (Connection String). Sie hat das Format:
+   `postgresql://[USER]:[PASSWORD]@[HOST]:[PORT]/[DB_NAME]`
+4. Verbinde dich mit einem DB-Tool deiner Wahl (z. B. Adminer, pgAdmin) und führe das Script `supabase/schema_full_v2.sql` aus, um die Tabellenstruktur aufzusetzen.
 
-### 2. Render-Deploy
+### 2. Node.js App in Coolify bereitstellen
 
-ENV-Variablen:
+1. Erstelle eine neue Ressource in Coolify: **Application -> Github Repository**.
+2. Nutze das NodeJS Nixpack (wird von Coolify automatisch erkannt).
+3. Setze folgende Umgebungsvariablen in den App-Einstellungen unter **Environment Variables**:
 
 ```
-SUPABASE_URL=<URL der NEUEN Berater-Datenbank>
-SUPABASE_SERVICE_ROLE_KEY=<Service-Role-Key der NEUEN DB>
+DATABASE_URL=<PostgreSQL-Verbindungs-URL>
 DEEPSEEK_API_KEY=<DeepSeek-API-Key>
 OPENAI_API_KEY=<OpenAI-Key fuer Embeddings>
 TELEGRAM_BOT_TOKEN=<Support-Bot-Token>
@@ -44,23 +47,15 @@ ADMIN_PASSWORD=<Dashboard-Passwort>
 JWT_SECRET=<32-Zeichen-Zufallswert>
 VAPID_PUBLIC_KEY=<Web-Push Public-Key>
 VAPID_PRIVATE_KEY=<Web-Push Private-Key>
-APP_URL=https://dein-berater.onrender.com
+APP_URL=https://dein-berater.domain.de
 PORT=3000
 ```
 
-Build-Command:
-```
-npm install
-```
-
-Start-Command:
-```
-node src/server.js
-```
+4. Klicke auf **Deploy**. Coolify installiert die Abhängigkeiten und startet die App automatisch.
 
 ### 3. Erstkonfiguration
 
-1. Dashboard oeffnen: `https://dein-berater.onrender.com/admin`
+1. Dashboard oeffnen: `https://dein-berater.domain.de/admin`
 2. Einloggen
 3. Settings → System-Prompt anpassen
 4. Settings → Sellauth → API-Key + Shop-ID eintragen → Sellauth-Sync starten
@@ -70,7 +65,7 @@ node src/server.js
 
 Im `<head>` oder vor `</body>` der Kunden-Website:
 ```html
-<script async src="https://dein-berater.onrender.com/widget.js"></script>
+<script async src="https://dein-berater.domain.de/widget.js"></script>
 ```
 
 ## Endpunkte
@@ -99,5 +94,5 @@ window.__VS25_VERSION      // sollte "1.6.78" sein
 
 Plus den Health-Endpoint anpingen:
 ```
-https://dein-berater.onrender.com/api/widget/health
+https://dein-berater.domain.de/api/widget/health
 ```

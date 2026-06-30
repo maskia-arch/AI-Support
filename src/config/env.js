@@ -3,7 +3,7 @@ dotenv.config();
 
 // Pflicht-Variablen – App startet auch ohne sie, loggt aber eine Warnung
 const required = [
-  'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY',
+  'DATABASE_URL',
   'DEEPSEEK_API_KEY',
   'TELEGRAM_BOT_TOKEN',
   'ADMIN_USERNAME', 'ADMIN_PASSWORD',
@@ -16,9 +16,8 @@ required.forEach(name => {
 });
 
 module.exports = {
-  supabase: {
-    url: process.env.SUPABASE_URL,
-    key: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  database: {
+    url: process.env.DATABASE_URL,
   },
   deepseek: {
     apiKey: process.env.DEEPSEEK_API_KEY,
