@@ -6,39 +6,34 @@ Customer-Support-Bot mit Web-Widget und eigenem Admin-Dashboard, lauffähig auf 
 
 - **Web-Widget**: Einbettbares Chat-Widget fuer deine Website
 - **Telegram-Support-Bot**: Kunden koennen auch via Telegram chatten
-- **Knowledge-Base mit RAG**: Wissensbasis durchsucht per Embedding-Vektor
+- **Knowledge-Base mit RAG**: Wissensbasis durchsucht per Embedding-Vektor (PostgreSQL pgvector oder lokaler Javascript Cosine-Similarity Fallback)
 - **Lernen-Workflow**: Unbeantwortete Fragen landen in einer Queue
 - **Sellauth-Integration**: Bestellungen + Produkt-Lookup
 - **Daily Coupons**: Aktionscodes nach Wochenplan
 - **Visitor-Tracking**: Besucher-Sessions, Page-Views, Bans
 
-## Architektur
+## Architektur (SQLite - Empfohlen 🌟)
 
 ```
-Coolify VPS-Service (NodeJS) ──── Lokale PostgreSQL-Datenbank (mit pgvector)
+Coolify VPS-Service (NodeJS) ──── Lokale SQLite-Datenbank (/usr/src/app/data/sqlite.db)
        │
        ├── Telegram-Support-Bot (TELEGRAM_BOT_TOKEN)
        └── /widget.js → Kunden-Website
 ```
 
-## Erstmal-Setup
+## Erstmal-Setup (SQLite - Ohne DB-Server-Konfiguration)
 
-### 1. PostgreSQL-Datenbank in Coolify anlegen
+### 1. Volume in Coolify anlegen
+1. Öffne deine Anwendung in Coolify.
+2. Gehe auf **Storages** (Speicher) und füge ein Volume hinzu:
+   - **Destination Path:** `/usr/src/app/data`
+   - **Name:** z. B. `esim-bot-data`
+3. Dadurch wird die SQLite-Datenbankdatei dauerhaft auf deinem VPS gespeichert und geht bei Updates nicht verloren.
 
-1. Erstelle in Coolify ein neues Service-Projekt oder füge eine neue Ressource hinzu: **Database -> PostgreSQL**.
-2. **WICHTIG:** Nutze ein PostgreSQL-Image, das pgvector unterstützt (z. B. `ankane/pgvector`).
-3. Kopiere nach dem Start die interne oder externe Verbindungs-URL (Connection String). Sie hat das Format:
-   `postgresql://[USER]:[PASSWORD]@[HOST]:[PORT]/[DB_NAME]`
-4. Verbinde dich mit einem DB-Tool deiner Wahl (z. B. Adminer, pgAdmin) und führe das Script `supabase/schema_full_v2.sql` aus, um die Tabellenstruktur aufzusetzen.
-
-### 2. Node.js App in Coolify bereitstellen
-
-1. Erstelle eine neue Ressource in Coolify: **Application -> Github Repository**.
-2. Nutze das NodeJS Nixpack (wird von Coolify automatisch erkannt).
-3. Setze folgende Umgebungsvariablen in den App-Einstellungen unter **Environment Variables**:
+### 2. Umgebungsvariablen setzen
+Setze in Coolify unter **Environment Variables** folgende Werte:
 
 ```
-DATABASE_URL=<PostgreSQL-Verbindungs-URL>
 DEEPSEEK_API_KEY=<DeepSeek-API-Key>
 OPENAI_API_KEY=<OpenAI-Key fuer Embeddings>
 TELEGRAM_BOT_TOKEN=<Support-Bot-Token>
@@ -50,49 +45,28 @@ VAPID_PRIVATE_KEY=<Web-Push Private-Key>
 APP_URL=https://dein-berater.domain.de
 PORT=3000
 ```
-
-4. Klicke auf **Deploy**. Coolify installiert die Abhängigkeiten und startet die App automatisch.
+*(Hinweis: Lass `DATABASE_URL` einfach leer, damit die App automatisch SQLite nutzt.)*
 
 ### 3. Erstkonfiguration
-
 1. Dashboard oeffnen: `https://dein-berater.domain.de/admin`
-2. Einloggen
+2. Einloggen (Tabellen werden beim ersten Start automatisch erstellt!)
 3. Settings → System-Prompt anpassen
 4. Settings → Sellauth → API-Key + Shop-ID eintragen → Sellauth-Sync starten
 5. Knowledge-Base aufbauen: Manuelle Eintraege oder Scraper
 
 ### 4. Widget auf Website einbauen
-
 Im `<head>` oder vor `</body>` der Kunden-Website:
 ```html
 <script async src="https://dein-berater.domain.de/widget.js"></script>
 ```
 
-## Endpunkte
+---
 
-```
-POST /api/webhooks/telegram       Bot-Webhook (Telegram)
-POST /api/widget/init             Widget-Session-Start
-POST /api/widget/message          Widget-Nachricht
-GET  /api/widget/config           Widget-Konfig
-GET  /api/widget/health           Widget-Health-Check
-POST /api/admin/login             Dashboard-Login
-GET  /api/admin/chats             Chat-Liste
-GET  /api/admin/knowledge/entries Knowledge-Liste
-GET  /widget.js                   Widget-Embed-Script
-GET  /admin                       Dashboard-UI
-GET  /health                      Liveness-Check
-```
+## Alternative: PostgreSQL-Verwendung
 
-## Diagnose
-
-Bei Widget-Problemen Browser-Console oeffnen:
-```js
-window.__VS25_LOADED       // sollte true sein
-window.__VS25_VERSION      // sollte "1.6.78" sein
-```
-
-Plus den Health-Endpoint anpingen:
-```
-https://dein-berater.domain.de/api/widget/health
-```
+Falls du lieber eine separate PostgreSQL-Datenbank nutzen möchtest:
+1. Erstelle eine PostgreSQL-Datenbank in Coolify (mit `pgvector` Support).
+2. Führe das Script `supabase/schema_full_v2.sql` auf deiner Datenbank aus.
+3. Trage die `DATABASE_URL` in den Umgebungsvariablen deiner App ein.
+   Format: `postgresql://[USER]:[PASSWORD]@[HOST]:[PORT]/[DB_NAME]`
+   Die App wechselt dann automatisch in den PostgreSQL-Modus.

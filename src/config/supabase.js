@@ -1,23 +1,327 @@
 const { Pool } = require('pg');
+const sqlite3 = require('sqlite3');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { database: dbConfig } = require('./env');
 const logger = require('../utils/logger');
 
-// Set up PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: dbConfig.url,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
+// Bestimme Treiber: Nutze Postgres, falls DATABASE_URL gesetzt ist und mit "postgres" beginnt.
+// Andernfalls weichen wir auf SQLite aus.
+const isPostgres = !!(dbConfig.url && dbConfig.url.startsWith('postgres'));
 
-pool.on('error', (err) => {
-  logger.error(`[DB Pool Error] ${err.message}`);
-});
+let pool = null;
+let db = null;
+
+if (isPostgres) {
+  logger.info('[DB Setup] Verwende PostgreSQL-Datenbank.');
+  pool = new Pool({
+    connectionString: dbConfig.url,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  });
+
+  pool.on('error', (err) => {
+    logger.error(`[DB Pool Error] ${err.message}`);
+  });
+} else {
+  logger.info('[DB Setup] Keine DATABASE_URL gefunden. Fallback auf lokale SQLite-Datenbank.');
+  const dbPath = path.join(__dirname, '../../data/sqlite.db');
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+  
+  db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+      logger.error(`[SQLite Open Error] ${err.message}`);
+    } else {
+      logger.info(`[DB Setup] SQLite-Datenbank geöffnet unter: ${dbPath}`);
+    }
+  });
+}
+
+// ==============================================================================
+// Schemadefinitionen und Initialisierung
+// ==============================================================================
+
+const SQLITE_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    system_prompt TEXT NOT NULL DEFAULT 'Du bist ein hilfreicher Assistent fuer eSIM-Beratung.',
+    negative_prompt TEXT DEFAULT '',
+    welcome_message TEXT DEFAULT 'Hallo! 👋 Wie kann ich dir helfen?',
+    manual_msg_template TEXT DEFAULT 'Ein Mitarbeiter wird gleich uebernehmen.',
+    ai_model TEXT DEFAULT 'deepseek-v4-flash',
+    ai_max_tokens INTEGER DEFAULT 1024,
+    ai_temperature REAL DEFAULT 0.5,
+    ai_max_input_tokens INTEGER DEFAULT 4096,
+    rag_threshold REAL DEFAULT 0.3,
+    rag_match_count INTEGER DEFAULT 8,
+    max_history_msgs INTEGER DEFAULT 4,
+    summary_interval INTEGER DEFAULT 5,
+    sellauth_api_key TEXT DEFAULT '',
+    sellauth_shop_id TEXT DEFAULT '',
+    sellauth_shop_url TEXT DEFAULT '',
+    admin_telegram_id TEXT DEFAULT '',
+    notify_new_chat INTEGER DEFAULT 1,
+    notify_every_msg INTEGER DEFAULT 0,
+    webhook_url TEXT DEFAULT '',
+    widget_powered_by TEXT DEFAULT 'Powered by ValueShop25 AI',
+    abuse_max_msgs_per_hour INTEGER DEFAULT 30,
+    abuse_auto_ban_flags INTEGER DEFAULT 3,
+    abuse_min_msg_length INTEGER DEFAULT 1,
+    coupon_enabled INTEGER DEFAULT 0,
+    coupon_discount INTEGER DEFAULT 10,
+    coupon_type TEXT DEFAULT 'percentage',
+    coupon_description TEXT DEFAULT '10% Rabatt',
+    coupon_max_uses INTEGER DEFAULT NULL,
+    coupon_schedule_hour INTEGER DEFAULT 0,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  INSERT OR IGNORE INTO settings (id) VALUES (1);
+
+  CREATE TABLE IF NOT EXISTS chats (
+    id TEXT PRIMARY KEY,
+    platform TEXT NOT NULL DEFAULT 'telegram',
+    status TEXT DEFAULT 'ki',
+    is_manual_mode INTEGER DEFAULT 0,
+    metadata TEXT DEFAULT '{}',
+    last_message TEXT,
+    last_message_role TEXT DEFAULT 'user',
+    message_count INTEGER DEFAULT 0,
+    first_name TEXT,
+    username TEXT,
+    chat_summary TEXT,
+    summary_msg_count INTEGER DEFAULT 0,
+    last_summarized_at TEXT,
+    flag_count INTEGER DEFAULT 0,
+    auto_muted INTEGER DEFAULT 0,
+    mute_reason TEXT,
+    msg_count_1h INTEGER DEFAULT 0,
+    last_msg_burst TEXT,
+    visitor_ip TEXT,
+    visitor_id TEXT,
+    manual_mode_started_at TEXT,
+    manual_mode_ended_at TEXT,
+    is_learning_session INTEGER DEFAULT 0,
+    mute_until TEXT,
+    spam_warn_count INTEGER DEFAULT 0,
+    last_spam_warn_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT REFERENCES chats(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    embedding_tokens INTEGER DEFAULT 0,
+    is_manual INTEGER DEFAULT 0,
+    is_handover INTEGER DEFAULT 0,
+    classification TEXT DEFAULT NULL,
+    rag_hits TEXT DEFAULT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS knowledge_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    parent_id INTEGER REFERENCES knowledge_categories(id) ON DELETE SET NULL,
+    display_order INTEGER DEFAULT 0,
+    icon TEXT,
+    color TEXT DEFAULT '#3b82f6',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS knowledge_base (
+    id TEXT PRIMARY KEY,
+    category_id INTEGER REFERENCES knowledge_categories(id) ON DELETE SET NULL,
+    title TEXT,
+    content TEXT NOT NULL,
+    source_url TEXT,
+    source_type TEXT DEFAULT 'manual',
+    source TEXT,
+    embedding TEXT,
+    is_active INTEGER DEFAULT 1,
+    views INTEGER DEFAULT 0,
+    last_synced TEXT,
+    metadata TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  INSERT OR IGNORE INTO knowledge_categories (id, name, icon, color) VALUES
+    (1, 'Travel eSIM',          '✈️',  '#3b82f6'),
+    (2, 'Unlimited Eco eSIM',   '🌿',  '#10b981'),
+    (3, 'Unlimited Pro eSIM',   '⚡',  '#8b5cf6'),
+    (4, 'FAQ & Anleitung',      '❓',  '#64748b'),
+    (5, 'Technischer Support',  '🛠️', '#94a3b8');
+
+  CREATE TABLE IF NOT EXISTS learning_queue (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT,
+    question TEXT NOT NULL,
+    context TEXT,
+    status TEXT DEFAULT 'pending',
+    resolved_answer TEXT,
+    resolved_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS blacklist (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT,
+    visitor_ip TEXT,
+    reason TEXT,
+    banned_by TEXT,
+    banned_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS user_flags (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT,
+    flag_type TEXT NOT NULL,
+    details TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS widget_visitors (
+    chat_id TEXT PRIMARY KEY,
+    ip TEXT,
+    fingerprint TEXT,
+    user_agent TEXT,
+    first_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+    metadata TEXT DEFAULT '{}',
+    ip_hash TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS visitor_sessions (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT,
+    started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+    is_active INTEGER DEFAULT 1,
+    entry_page TEXT,
+    last_page TEXT,
+    page_count INTEGER DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS visitor_activities (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT,
+    activity_type TEXT,
+    page_url TEXT,
+    page_title TEXT,
+    activity TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS daily_coupons (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    discount_value INTEGER,
+    discount_type TEXT DEFAULT 'percentage',
+    description TEXT,
+    active_from TEXT DEFAULT CURRENT_TIMESTAMP,
+    active_until TEXT,
+    max_uses INTEGER,
+    uses INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    sellauth_id TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS coupon_schedule (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    weekday INTEGER NOT NULL UNIQUE CHECK (weekday BETWEEN 0 AND 6),
+    enabled INTEGER DEFAULT 1,
+    discount INTEGER DEFAULT 10,
+    type TEXT DEFAULT 'percentage',
+    description TEXT,
+    max_uses INTEGER,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  INSERT OR IGNORE INTO coupon_schedule (weekday, enabled, discount, type, description) VALUES
+    (0, 1, 10, 'percentage', ''),
+    (1, 1, 10, 'percentage', ''),
+    (2, 1, 10, 'percentage', ''),
+    (3, 1, 10, 'percentage', ''),
+    (4, 1, 10, 'percentage', ''),
+    (5, 1, 10, 'percentage', ''),
+    (6, 1, 10, 'percentage', '');
+
+  CREATE TABLE IF NOT EXISTS admin_subscriptions (
+    id TEXT PRIMARY KEY,
+    endpoint TEXT NOT NULL UNIQUE,
+    subscription_data TEXT NOT NULL,
+    device_label TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS integration_logs (
+    id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    event_type TEXT,
+    payload TEXT,
+    status TEXT,
+    error TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS sync_jobs (
+    id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    progress INTEGER DEFAULT 0,
+    total INTEGER,
+    result TEXT,
+    error TEXT,
+    started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS discovered_links (
+    id TEXT PRIMARY KEY,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT,
+    status TEXT DEFAULT 'pending',
+    category_id INTEGER REFERENCES knowledge_categories(id) ON DELETE SET NULL,
+    discovered_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS user_feedbacks (
+    id TEXT PRIMARY KEY,
+    channel_id TEXT,
+    target_user_id TEXT,
+    target_username TEXT,
+    feedback_type TEXT,
+    status TEXT DEFAULT 'pending',
+    has_proofs INTEGER DEFAULT 0,
+    proof_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS feedback_proofs (
+    id TEXT PRIMARY KEY,
+    feedback_id TEXT REFERENCES user_feedbacks(id) ON DELETE CASCADE,
+    proof_url TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+`;
 
 // Hilfsfunktion zum Aufteilen eines SQL-Skripts in einzelne Anweisungen.
-// Beachtet $$-Blöcke (z. B. für PostgreSQL-Funktionen), damit Semicolons darin nicht fälschlich trennen.
 function splitSqlStatements(sql) {
   const statements = [];
   let current = '';
@@ -50,64 +354,115 @@ function splitSqlStatements(sql) {
   });
 }
 
-// Auto-Initialisierung des Datenbankschemas beim Start
+// Führt die Schema-Initialisierung beim Starten aus
 async function initializeDatabase() {
-  try {
-    const checkSql = `
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'settings'
-      );
-    `;
-    const res = await pool.query(checkSql);
-    const exists = res.rows[0]?.exists;
-    if (!exists) {
-      logger.info('[DB Init] Tabelle "settings" nicht gefunden. Initialisiere Datenbank...');
-      const schemaPath = path.join(__dirname, '../../supabase/schema_full_v2.sql');
-      if (fs.existsSync(schemaPath)) {
-        const sql = fs.readFileSync(schemaPath, 'utf8');
-        const statements = splitSqlStatements(sql);
-        
-        for (const stmt of statements) {
-          try {
-            await pool.query(stmt);
-          } catch (stmtErr) {
-            // Falls CREATE EXTENSION fehlschlägt (z. B. weil die Rolle 'supabase_admin' fehlt oder keine Superuser-Rechte vorliegen),
-            // loggen wir eine Warnung, fahren aber fort, da Extensions auf Cloud-Plattformen wie Supabase meist schon aktiv sind.
-            if (stmt.toUpperCase().includes('CREATE EXTENSION')) {
-              logger.warn(`[DB Init] Warnung bei Extension-Erstellung (wird ignoriert): ${stmtErr.message}`);
-            } else {
-              throw stmtErr; // Kritischer Fehler bei Tabellen/Indizes -> abbrechen
+  if (isPostgres) {
+    try {
+      const checkSql = 'SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = \'public\' AND table_name = \'settings\');';
+      const res = await pool.query(checkSql);
+      const exists = res.rows[0]?.exists;
+      if (!exists) {
+        logger.info('[DB Init] Postgres: Tabelle "settings" nicht gefunden. Initialisiere Datenbank...');
+        const schemaPath = path.join(__dirname, '../../supabase/schema_full_v2.sql');
+        if (fs.existsSync(schemaPath)) {
+          const sql = fs.readFileSync(schemaPath, 'utf8');
+          const statements = splitSqlStatements(sql);
+          for (const stmt of statements) {
+            try {
+              await pool.query(stmt);
+            } catch (stmtErr) {
+              if (stmt.toUpperCase().includes('CREATE EXTENSION')) {
+                logger.warn(`[DB Init] Postgres: Extension-Erstellung ignoriert: ${stmtErr.message}`);
+              } else {
+                throw stmtErr;
+              }
             }
           }
+          logger.info('[DB Init] Postgres: Datenbank erfolgreich initialisiert.');
         }
-        logger.info('[DB Init] Datenbank erfolgreich initialisiert.');
       } else {
-        logger.warn(`[DB Init] Schema-Datei nicht gefunden unter: ${schemaPath}`);
+        logger.info('[DB Init] Postgres: Bereits initialisiert.');
       }
-    } else {
-      logger.info('[DB Init] Datenbank bereits initialisiert.');
+    } catch (err) {
+      logger.error(`[DB Init] Postgres-Fehler: ${err.message}`);
     }
-  } catch (err) {
-    logger.error(`[DB Init] Fehler bei der Datenbank-Initialisierung: ${err.message}`);
+  } else {
+    // SQLite Initialisierung
+    return new Promise((resolve) => {
+      db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='settings';", async (err, row) => {
+        if (err) {
+          logger.error(`[DB Init] SQLite Check Error: ${err.message}`);
+          return resolve();
+        }
+        if (!row) {
+          logger.info('[DB Init] SQLite: Initialisiere Tabellen...');
+          const statements = splitSqlStatements(SQLITE_SCHEMA);
+          for (const stmt of statements) {
+            await new Promise((resStmt) => {
+              db.run(stmt, (stmtErr) => {
+                if (stmtErr) logger.error(`[DB Init] SQLite Statement Error: ${stmtErr.message} | SQL: ${stmt}`);
+                resStmt();
+              });
+            });
+          }
+          logger.info('[DB Init] SQLite: Datenbank erfolgreich initialisiert.');
+        } else {
+          logger.info('[DB Init] SQLite: Bereits initialisiert.');
+        }
+        resolve();
+      });
+    });
   }
 }
 
+// Führe Initialisierung im Hintergrund aus
 initializeDatabase().catch(err => {
   logger.error(`[DB Init Background] Fehler: ${err.message}`);
 });
 
-// Helper to format JavaScript variables into PostgreSQL-compatible formats.
-// Crucial for pgvector: converts number arrays [0.1, 0.2, ...] to vector string format '[0.1,0.2,...]'.
-const formatParam = (val) => {
-  if (Array.isArray(val)) {
-    if (val.length > 0 && typeof val[0] === 'number') {
-      return '[' + val.join(',') + ']';
+// ==============================================================================
+// Adapter-Helfer
+// ==============================================================================
+
+// Konvertiert arrays / objects für den jeweiligen Treiber
+const formatValueForDriver = (val) => {
+  if (val === undefined) return null;
+  if (isPostgres) {
+    if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'number') {
+      return '[' + val.join(',') + ']'; // pgvector format
+    }
+    return val;
+  } else {
+    // SQLite Modus: Speichere Arrays und Objekte als JSON-String
+    if (val !== null && (typeof val === 'object' || Array.isArray(val))) {
+      return JSON.stringify(val);
+    }
+    return val;
+  }
+};
+
+// Parst zurückerhaltene JSON-Felder in SQLite wieder zu JavaScript Objekten
+const parseRow = (row) => {
+  if (!row) return row;
+  const parsed = { ...row };
+  for (const [key, val] of Object.entries(parsed)) {
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          parsed[key] = JSON.parse(val);
+        } catch (e) {
+          // Behalte als String
+        }
+      }
     }
   }
-  return val;
+  return parsed;
 };
+
+// ==============================================================================
+// QueryBuilder Kompatibilitätsklasse
+// ==============================================================================
 
 class QueryBuilder {
   constructor(table) {
@@ -250,6 +605,9 @@ class QueryBuilder {
     let sql = '';
     const params = [];
 
+    // Platzhalter für Postgres ($1, $2) vs. SQLite (?)
+    const placeholderFunc = isPostgres ? (idx) => `$${idx}` : () => '?';
+
     const compileCondition = (cond) => {
       if (cond.op === 'OR') {
         const orParts = cond.raw.split(',');
@@ -269,15 +627,15 @@ class QueryBuilder {
               if (val === null) {
                 compiledParts.push(`"${col}" IS NULL`);
               } else {
-                params.push(formatParam(val));
-                compiledParts.push(`"${col}" = $${params.length}`);
+                params.push(formatValueForDriver(val));
+                compiledParts.push(`"${col}" = ${placeholderFunc(params.length)}`);
               }
             } else if (op === 'neq') {
               if (val === null) {
                 compiledParts.push(`"${col}" IS NOT NULL`);
               } else {
-                params.push(formatParam(val));
-                compiledParts.push(`"${col}" != $${params.length}`);
+                params.push(formatValueForDriver(val));
+                compiledParts.push(`"${col}" != ${placeholderFunc(params.length)}`);
               }
             }
           }
@@ -288,51 +646,52 @@ class QueryBuilder {
       const { col, op, val, subop } = cond;
       if (op === '=') {
         if (val === null) return `"${col}" IS NULL`;
-        params.push(formatParam(val));
-        return `"${col}" = $${params.length}`;
+        params.push(formatValueForDriver(val));
+        return `"${col}" = ${placeholderFunc(params.length)}`;
       }
       if (op === '!=') {
         if (val === null) return `"${col}" IS NOT NULL`;
-        params.push(formatParam(val));
-        return `"${col}" != $${params.length}`;
+        params.push(formatValueForDriver(val));
+        return `"${col}" != ${placeholderFunc(params.length)}`;
       }
       if (op === '>') {
-        params.push(formatParam(val));
-        return `"${col}" > $${params.length}`;
+        params.push(formatValueForDriver(val));
+        return `"${col}" > ${placeholderFunc(params.length)}`;
       }
       if (op === '>=') {
-        params.push(formatParam(val));
-        return `"${col}" >= $${params.length}`;
+        params.push(formatValueForDriver(val));
+        return `"${col}" >= ${placeholderFunc(params.length)}`;
       }
       if (op === '<') {
-        params.push(formatParam(val));
-        return `"${col}" < $${params.length}`;
+        params.push(formatValueForDriver(val));
+        return `"${col}" < ${placeholderFunc(params.length)}`;
       }
       if (op === '<=') {
-        params.push(formatParam(val));
-        return `"${col}" <= $${params.length}`;
+        params.push(formatValueForDriver(val));
+        return `"${col}" <= ${placeholderFunc(params.length)}`;
       }
       if (op === 'IS') {
         if (val === null) return `"${col}" IS NULL`;
-        params.push(formatParam(val));
-        return `"${col}" IS $${params.length}`;
+        params.push(formatValueForDriver(val));
+        return `"${col}" IS ${placeholderFunc(params.length)}`;
       }
       if (op === 'NOT') {
         if (subop === 'is' && val === null) return `"${col}" IS NOT NULL`;
-        params.push(formatParam(val));
-        return `NOT ("${col}" ${subop} $${params.length})`;
+        params.push(formatValueForDriver(val));
+        return `NOT ("${col}" ${subop} ${placeholderFunc(params.length)})`;
       }
       if (op === 'IN') {
         if (!Array.isArray(val) || val.length === 0) return 'FALSE';
         const placeholders = val.map(v => {
-          params.push(formatParam(v));
-          return `$${params.length}`;
+          params.push(formatValueForDriver(v));
+          return placeholderFunc(params.length);
         }).join(', ');
         return `"${col}" IN (${placeholders})`;
       }
       if (op === 'ILIKE') {
-        params.push(formatParam(val));
-        return `"${col}" ILIKE $${params.length}`;
+        params.push(formatValueForDriver(val));
+        const likeOp = isPostgres ? 'ILIKE' : 'LIKE';
+        return `"${col}" ${likeOp} ${placeholderFunc(params.length)}`;
       }
       return 'TRUE';
     };
@@ -341,10 +700,11 @@ class QueryBuilder {
 
     if (this.op === 'select') {
       let fieldsSql = this.selectFields;
-      if (this.countOption === 'exact' && !this.isHead) {
+      // Postgres COUNT(*) OVER() Trick
+      if (isPostgres && this.countOption === 'exact' && !this.isHead) {
         fieldsSql = `${this.selectFields}, COUNT(*) OVER() AS __full_count`;
         countEnabled = true;
-      } else if (this.isHead) {
+      } else if (isPostgres && this.isHead) {
         fieldsSql = 'COUNT(*) AS __full_count';
         countEnabled = true;
       }
@@ -368,6 +728,17 @@ class QueryBuilder {
       if (!this.insertData || this.insertData.length === 0) {
         return { data: [], error: null, count: 0 };
       }
+      
+      // Auto-generiere UUIDs in JavaScript falls SQLite und Feld id leer ist
+      if (!isPostgres) {
+        const uuidTables = ['messages', 'knowledge_base', 'learning_queue', 'blacklist', 'user_flags', 'visitor_sessions', 'visitor_activities', 'daily_coupons', 'admin_subscriptions', 'integration_logs', 'sync_jobs', 'discovered_links', 'user_feedbacks', 'feedback_proofs'];
+        for (const row of this.insertData) {
+          if (!row.id && uuidTables.includes(this.table)) {
+            row.id = crypto.randomUUID();
+          }
+        }
+      }
+
       const keys = Array.from(new Set(this.insertData.reduce((acc, row) => acc.concat(Object.keys(row)), [])));
       const columns = keys.map(k => `"${k}"`).join(', ');
       
@@ -376,8 +747,8 @@ class QueryBuilder {
         const rowPlaceholders = [];
         for (const key of keys) {
           const val = row[key] !== undefined ? row[key] : null;
-          params.push(formatParam(val));
-          rowPlaceholders.push(`$${params.length}`);
+          params.push(formatValueForDriver(val));
+          rowPlaceholders.push(placeholderFunc(params.length));
         }
         valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`);
       }
@@ -390,8 +761,8 @@ class QueryBuilder {
       }
       const setClauses = [];
       for (const [key, val] of Object.entries(this.updateData)) {
-        params.push(formatParam(val));
-        setClauses.push(`"${key}" = $${params.length}`);
+        params.push(formatValueForDriver(val));
+        setClauses.push(`"${key}" = ${placeholderFunc(params.length)}`);
       }
 
       sql = `UPDATE "${this.table}" SET ${setClauses.join(', ')}`;
@@ -413,8 +784,8 @@ class QueryBuilder {
         const rowPlaceholders = [];
         for (const key of keys) {
           const val = row[key] !== undefined ? row[key] : null;
-          params.push(formatParam(val));
-          rowPlaceholders.push(`$${params.length}`);
+          params.push(formatValueForDriver(val));
+          rowPlaceholders.push(placeholderFunc(params.length));
         }
         valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`);
       }
@@ -441,20 +812,49 @@ class QueryBuilder {
     }
 
     try {
-      const result = await pool.query(sql, params);
-      let data = result.rows;
+      let data = [];
       let count = null;
 
-      if (countEnabled && data.length > 0) {
-        if (this.isHead) {
-          count = parseInt(data[0].__full_count, 10);
-          data = [];
-        } else {
-          count = parseInt(data[0].__full_count, 10);
-          data.forEach(row => delete row.__full_count);
+      if (isPostgres) {
+        const result = await pool.query(sql, params);
+        data = result.rows;
+
+        if (countEnabled && data.length > 0) {
+          if (this.isHead) {
+            count = parseInt(data[0].__full_count, 10);
+            data = [];
+          } else {
+            count = parseInt(data[0].__full_count, 10);
+            data.forEach(row => delete row.__full_count);
+          }
+        } else if (countEnabled) {
+          count = 0;
         }
-      } else if (countEnabled) {
-        count = 0;
+      } else {
+        // SQLite Modus
+        data = await new Promise((resolve, reject) => {
+          db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows || []);
+          });
+        });
+        // Parse JSON-Felder zurück zu JS-Objekten
+        data = data.map(parseRow);
+
+        // SQLite separates Count Query (da window functions COUNT(*) OVER() nicht immer performant sind)
+        if (this.countOption === 'exact' || this.isHead) {
+          const countSql = `SELECT COUNT(*) AS total FROM "${this.table}"` + 
+            (this.conditions.length > 0 ? ` WHERE ${this.conditions.map(compileCondition).join(' AND ')}` : '');
+          
+          const countRes = await new Promise((resolve, reject) => {
+            db.get(countSql, params, (err, row) => {
+              if (err) reject(err);
+              else resolve(row ? row.total : 0);
+            });
+          });
+          count = countRes;
+          if (this.isHead) data = [];
+        }
       }
 
       if (this.singleRow) {
@@ -478,28 +878,87 @@ const supabase = {
   from: (table) => new QueryBuilder(table),
 
   async rpc(fnName, params = {}) {
-    let sql = '';
-    const values = [];
+    if (isPostgres) {
+      let sql = '';
+      const values = [];
 
-    if (fnName === 'match_knowledge') {
-      sql = `SELECT * FROM match_knowledge($1, $2, $3)`;
-      values.push(formatParam(params.query_embedding), formatParam(params.match_threshold), formatParam(params.match_count));
-    } else if (fnName === 'update_user_reputation') {
-      sql = `SELECT update_user_reputation($1, $2, $3, $4)`;
-      values.push(formatParam(params.p_channel_id), formatParam(params.p_user_id), formatParam(params.p_username), formatParam(params.p_delta));
+      if (fnName === 'match_knowledge') {
+        sql = 'SELECT * FROM match_knowledge($1, $2, $3)';
+        values.push(formatValueForDriver(params.query_embedding), formatValueForDriver(params.match_threshold), formatValueForDriver(params.match_count));
+      } else if (fnName === 'update_user_reputation') {
+        sql = 'SELECT update_user_reputation($1, $2, $3, $4)';
+        values.push(formatValueForDriver(params.p_channel_id), formatValueForDriver(params.p_user_id), formatValueForDriver(params.p_username), formatValueForDriver(params.p_delta));
+      } else {
+        const keys = Object.keys(params);
+        const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+        sql = `SELECT * FROM ${fnName}(${placeholders})`;
+        keys.forEach(k => values.push(formatValueForDriver(params[k])));
+      }
+
+      try {
+        const res = await pool.query(sql, values);
+        return { data: res.rows, error: null };
+      } catch (err) {
+        logger.error(`[DB Adapter RPC Error] RPC: ${fnName} | Msg: ${err.message}`);
+        return { data: null, error: err };
+      }
     } else {
-      const keys = Object.keys(params);
-      const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-      sql = `SELECT * FROM ${fnName}(${placeholders})`;
-      keys.forEach(k => values.push(formatParam(params[k])));
-    }
+      // SQLite Modus für RPCs
+      if (fnName === 'match_knowledge') {
+        try {
+          const queryEmbedding = params.query_embedding;
+          let matchThreshold = params.match_threshold || 0.3;
+          const matchCount = params.match_count || 8;
 
-    try {
-      const res = await pool.query(sql, values);
-      return { data: res.rows, error: null };
-    } catch (err) {
-      logger.error(`[DB Adapter RPC Error] RPC: ${fnName} | Msg: ${err.message}`);
-      return { data: null, error: err };
+          // Hole alle aktiven Wissenseinträge aus der SQLite DB
+          const rows = await new Promise((resolve, reject) => {
+            db.all('SELECT id, title, content, source_url, embedding FROM knowledge_base WHERE is_active = 1 AND embedding IS NOT NULL;', (err, resRows) => {
+              if (err) reject(err);
+              else resolve(resRows || []);
+            });
+          });
+
+          const results = [];
+          for (const row of rows) {
+            let emb = null;
+            try {
+              emb = typeof row.embedding === 'string' ? JSON.parse(row.embedding) : row.embedding;
+            } catch (e) {}
+
+            if (Array.isArray(emb) && emb.length === queryEmbedding.length) {
+              // Berechne Cosinus-Ähnlichkeit (da Vektoren bereits normalisiert sind = Skalarprodukt)
+              let dotProduct = 0;
+              for (let i = 0; i < queryEmbedding.length; i++) {
+                dotProduct += queryEmbedding[i] * (emb[i] || 0);
+              }
+              const similarity = dotProduct;
+              if (similarity > matchThreshold) {
+                results.push({
+                  id: row.id,
+                  title: row.title,
+                  content: row.content,
+                  source_url: row.source_url,
+                  similarity: similarity
+                });
+              }
+            }
+          }
+
+          // Sortiere absteigend nach Similarity und Limitiere
+          results.sort((a, b) => b.similarity - a.similarity);
+          const sliced = results.slice(0, matchCount);
+          return { data: sliced, error: null };
+        } catch (err) {
+          logger.error(`[DB Adapter SQLite RPC Error] match_knowledge: ${err.message}`);
+          return { data: null, error: err };
+        }
+      } else if (fnName === 'update_user_reputation') {
+        // Mock für update_user_reputation (wird nicht direkt aufgerufen, da catch-all)
+        return { data: [], error: null };
+      } else {
+        logger.warn(`[DB Adapter SQLite] RPC ${fnName} nicht unterstützt im SQLite Modus.`);
+        return { data: [], error: null };
+      }
     }
   }
 };

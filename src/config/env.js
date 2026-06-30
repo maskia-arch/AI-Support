@@ -3,7 +3,6 @@ dotenv.config();
 
 // Pflicht-Variablen – App startet auch ohne sie, loggt aber eine Warnung
 const required = [
-  'DATABASE_URL',
   'DEEPSEEK_API_KEY',
   'TELEGRAM_BOT_TOKEN',
   'ADMIN_USERNAME', 'ADMIN_PASSWORD',
