@@ -1,4 +1,6 @@
 const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
 const { database: dbConfig } = require('./env');
 const logger = require('../utils/logger');
 
@@ -12,6 +14,40 @@ const pool = new Pool({
 
 pool.on('error', (err) => {
   logger.error(`[DB Pool Error] ${err.message}`);
+});
+
+// Auto-Initialisierung des Datenbankschemas beim Start
+async function initializeDatabase() {
+  try {
+    const checkSql = `
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'settings'
+      );
+    `;
+    const res = await pool.query(checkSql);
+    const exists = res.rows[0]?.exists;
+    if (!exists) {
+      logger.info('[DB Init] Tabelle "settings" nicht gefunden. Initialisiere Datenbank...');
+      const schemaPath = path.join(__dirname, '../../supabase/schema_full_v2.sql');
+      if (fs.existsSync(schemaPath)) {
+        const sql = fs.readFileSync(schemaPath, 'utf8');
+        await pool.query(sql);
+        logger.info('[DB Init] Datenbank erfolgreich mit schema_full_v2.sql initialisiert.');
+      } else {
+        logger.warn(`[DB Init] Schema-Datei nicht gefunden unter: ${schemaPath}`);
+      }
+    } else {
+      logger.info('[DB Init] Datenbank bereits initialisiert.');
+    }
+  } catch (err) {
+    logger.error(`[DB Init] Fehler bei der Datenbank-Initialisierung: ${err.message}`);
+  }
+}
+
+initializeDatabase().catch(err => {
+  logger.error(`[DB Init Background] Fehler: ${err.message}`);
 });
 
 // Helper to format JavaScript variables into PostgreSQL-compatible formats.
