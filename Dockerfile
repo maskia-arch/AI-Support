@@ -1,5 +1,5 @@
-# Offizielles Node.js-LTS-Image als Basis
-FROM node:18-alpine
+# Offizielles Node.js-LTS-Image als Basis (min. Node 20 für Cheerios und Undicis dependencies)
+FROM node:20-alpine
 
 # Arbeitsverzeichnis im Container erstellen
 WORKDIR /usr/src/app
