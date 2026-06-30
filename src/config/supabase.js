@@ -321,15 +321,32 @@ const SQLITE_SCHEMA = `
   );
 `;
 
+// Entfernt SQL-Kommentare (Zeilen, die mit -- beginnen, sowie Inline-Kommentare) aus dem Skript.
+function stripSqlComments(sql) {
+  return sql.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('--')) {
+      return '';
+    }
+    const idx = line.indexOf('--');
+    if (idx >= 0) {
+      return line.substring(0, idx);
+    }
+    return line;
+  }).join('\n');
+}
+
 // Hilfsfunktion zum Aufteilen eines SQL-Skripts in einzelne Anweisungen.
+// Beachtet $$-Blöcke (z. B. für PostgreSQL-Funktionen), damit Semicolons darin nicht fälschlich trennen.
 function splitSqlStatements(sql) {
+  const cleanSql = stripSqlComments(sql);
   const statements = [];
   let current = '';
   let inDollarQuote = false;
   
-  for (let i = 0; i < sql.length; i++) {
-    const char = sql[i];
-    const nextChar = sql[i + 1];
+  for (let i = 0; i < cleanSql.length; i++) {
+    const char = cleanSql[i];
+    const nextChar = cleanSql[i + 1];
     
     if (char === '$' && nextChar === '$') {
       inDollarQuote = !inDollarQuote;
@@ -348,10 +365,7 @@ function splitSqlStatements(sql) {
   if (current.trim()) {
     statements.push(current.trim());
   }
-  return statements.filter(stmt => {
-    const cleaned = stmt.trim();
-    return cleaned.length > 0 && !cleaned.startsWith('--');
-  });
+  return statements.filter(stmt => stmt.trim().length > 0);
 }
 
 // Führt die Schema-Initialisierung beim Starten aus
@@ -374,6 +388,7 @@ async function initializeDatabase() {
               if (stmt.toUpperCase().includes('CREATE EXTENSION')) {
                 logger.warn(`[DB Init] Postgres: Extension-Erstellung ignoriert: ${stmtErr.message}`);
               } else {
+                logger.error(`[DB Init] Postgres-Fehler bei SQL-Statement: ${stmt.substring(0, 150)}...`);
                 throw stmtErr;
               }
             }
