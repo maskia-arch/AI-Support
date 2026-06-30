@@ -27,6 +27,172 @@ const messageProcessor = {
 
     const isFirstMessage = !chat._existed;
 
+    // ── /cancel Command (Bricht laufende Abfragen ab) ─────────────────────────
+    if (text && text.trim().toLowerCase() === '/cancel') {
+      if (chat.metadata && chat.metadata.waiting_for_order_id) {
+        const updatedMetadata = { ...chat.metadata, waiting_for_order_id: false };
+        try {
+          await supabase.from('chats').update({ metadata: updatedMetadata }).eq('id', chat.id);
+        } catch (e) {}
+        
+        const cancelReply = 'Vorgang abgebrochen. Wie kann ich dir sonst helfen?';
+        void (async () => {
+          try { await supabase.from('messages').insert([{ chat_id: chat.id, role: 'assistant', content: cancelReply }]); } catch (_) {}
+        })();
+        this._updateChatPreview(chat.id, cancelReply, 'assistant');
+        if (platform === 'telegram') {
+          await telegramService.sendMessage(chatId, cancelReply, {
+            message_thread_id: threadId,
+            token: botToken
+          }).catch(() => {});
+        }
+        return cancelReply;
+      }
+    }
+
+    // ── Order-Abfrage Wizard (Falls der User auf die Abfrage antwortet) ───────
+    if (text && chat.metadata && chat.metadata.waiting_for_order_id) {
+      const trimmedText = text.trim();
+      const ID_PATTERN = '([a-f0-9]+-[0-9]+|[0-9]+)';
+      const matchesPattern = new RegExp('^' + ID_PATTERN + '$', 'i').test(trimmedText);
+
+      if (matchesPattern) {
+        const invoiceId = trimmedText;
+        let orderReply;
+        try {
+          const sellauthService = require('./sellauthService');
+          let sData = null;
+          try {
+            const { data } = await supabase.from('settings')
+              .select('sellauth_api_key, sellauth_shop_id, sellauth_shop_url').single();
+            sData = data;
+          } catch (_) {}
+          const saApiKey  = process.env.SELLAUTH_API_KEY  || sData?.sellauth_api_key  || '';
+          const saShopId  = process.env.SELLAUTH_SHOP_ID  || sData?.sellauth_shop_id  || '';
+          const saShopUrl = process.env.SELLAUTH_SHOP_URL || sData?.sellauth_shop_url || '';
+          if (!saApiKey) {
+            orderReply = 'Bestellabfrage derzeit nicht verfügbar.';
+          } else {
+            const invoice = await sellauthService.getInvoice(saApiKey, saShopId, invoiceId);
+            orderReply = sellauthService.formatInvoiceForCustomer(invoice, saShopUrl);
+          }
+        } catch (err) {
+          logger.warn(`[/order Wizard] ${err.message}`);
+          orderReply = 'Bestellung nicht gefunden oder Fehler bei der Abfrage. Prüfe die Invoice-ID aus deiner Bestätigungs-E-Mail.';
+        }
+
+        const updatedMetadata = { ...chat.metadata, waiting_for_order_id: false };
+        try {
+          await supabase.from('chats').update({ metadata: updatedMetadata }).eq('id', chat.id);
+        } catch (e) {}
+
+        void (async () => {
+          try {
+            await supabase.from('messages').insert([{ chat_id: chat.id, role: 'user', content: text }]);
+            await supabase.from('messages').insert([{ chat_id: chat.id, role: 'assistant', content: orderReply }]);
+          } catch (_) {}
+        })();
+        this._updateChatPreview(chat.id, orderReply, 'assistant');
+
+        if (platform === 'telegram') {
+          await telegramService.sendMessage(chatId, orderReply, {
+            message_thread_id: threadId,
+            token: botToken,
+            parse_mode: 'HTML'
+          }).catch(() => {});
+        }
+        return orderReply;
+      } else {
+        const errorReply = 'Das eingegebene Format scheint ungültig zu sein. Bitte sende mir eine gültige Bestellungs-ID (z. B. <code>8fdefaa78a695-0000013694549</code>) oder schreibe /cancel, um abzubrechen.';
+        void (async () => {
+          try {
+            await supabase.from('messages').insert([{ chat_id: chat.id, role: 'user', content: text }]);
+            await supabase.from('messages').insert([{ chat_id: chat.id, role: 'assistant', content: errorReply }]);
+          } catch (_) {}
+        })();
+        this._updateChatPreview(chat.id, errorReply, 'assistant');
+
+        if (platform === 'telegram') {
+          await telegramService.sendMessage(chatId, errorReply, {
+            message_thread_id: threadId,
+            token: botToken,
+            parse_mode: 'HTML'
+          }).catch(() => {});
+        }
+        return errorReply;
+      }
+    }
+
+    // ── /order Command ohne Parameter (Wizard starten) ────────────────────────
+    if (text && text.trim().toLowerCase() === '/order') {
+      const updatedMetadata = { ...chat.metadata, waiting_for_order_id: true };
+      try {
+        await supabase.from('chats').update({ metadata: updatedMetadata }).eq('id', chat.id);
+      } catch (e) {}
+
+      const promptReply = 'Bitte sende mir deine Bestellungs-ID (z. B. <code>8fdefaa78a695-0000013694549</code>), damit ich den Status deiner Bestellung prüfen kann. (Schreibe /cancel, um abzubrechen).';
+      void (async () => {
+        try { await supabase.from('messages').insert([{ chat_id: chat.id, role: 'assistant', content: promptReply }]); } catch (_) {}
+      })();
+      this._updateChatPreview(chat.id, promptReply, 'assistant');
+
+      if (platform === 'telegram') {
+        await telegramService.sendMessage(chatId, promptReply, {
+          message_thread_id: threadId,
+          token: botToken,
+          parse_mode: 'HTML'
+        }).catch(() => {});
+      }
+      return promptReply;
+    }
+
+    // ── Standalone ID Erkennung (Automatische Abfrage bei passendem Muster) ────
+    if (text) {
+      const STANDALONE_ID_REGEX = /^[a-f0-9]+-[0-9]+$/i;
+      if (STANDALONE_ID_REGEX.test(text.trim())) {
+        const invoiceId = text.trim();
+        let orderReply;
+        try {
+          const sellauthService = require('./sellauthService');
+          let sData = null;
+          try {
+            const { data } = await supabase.from('settings')
+              .select('sellauth_api_key, sellauth_shop_id, sellauth_shop_url').single();
+            sData = data;
+          } catch (_) {}
+          const saApiKey  = process.env.SELLAUTH_API_KEY  || sData?.sellauth_api_key  || '';
+          const saShopId  = process.env.SELLAUTH_SHOP_ID  || sData?.sellauth_shop_id  || '';
+          const saShopUrl = process.env.SELLAUTH_SHOP_URL || sData?.sellauth_shop_url || '';
+          if (!saApiKey) {
+            orderReply = 'Bestellabfrage derzeit nicht verfügbar.';
+          } else {
+            const invoice = await sellauthService.getInvoice(saApiKey, saShopId, invoiceId);
+            orderReply = sellauthService.formatInvoiceForCustomer(invoice, saShopUrl);
+          }
+        } catch (err) {
+          logger.warn(`[Standalone ID Lookup] ${err.message}`);
+          orderReply = 'Bestellung nicht gefunden oder Fehler bei der Abfrage. Prüfe die Invoice-ID aus deiner Bestätigungs-E-Mail.';
+        }
+
+        void (async () => {
+          try {
+            await supabase.from('messages').insert([{ chat_id: chat.id, role: 'user', content: text }]);
+            await supabase.from('messages').insert([{ chat_id: chat.id, role: 'assistant', content: orderReply }]);
+          } catch (_) {}
+        })();
+        this._updateChatPreview(chat.id, orderReply, 'assistant');
+
+        if (platform === 'telegram') {
+          await telegramService.sendMessage(chatId, orderReply, {
+            message_thread_id: threadId,
+            token: botToken,
+            parse_mode: 'HTML'
+          }).catch(() => {});
+        }
+        return orderReply;
+      }
+    }
+
     // ── Faire Spam-Prüfung MIT Warnungen (nach Chat-Erstellung) ────────────
     // Liefert action + Nachricht. Es wird NIE still blockiert ohne Meldung.
     // metadata (ip, fingerprint) wird für vollständige Sperre übergeben.
