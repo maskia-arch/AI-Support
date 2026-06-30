@@ -382,47 +382,40 @@ async function initializeDatabase() {
       }
       logger.info(`[DB Setup] Postgres pgvector Support: ${hasPgVector ? 'JA' : 'NEIN'}`);
 
-      const checkSql = 'SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = \'public\' AND table_name = \'settings\');';
-      const res = await pool.query(checkSql);
-      const exists = res.rows[0]?.exists;
-      if (!exists) {
-        logger.info('[DB Init] Postgres: Tabelle "settings" nicht gefunden. Initialisiere Datenbank...');
-        const schemaPath = path.join(__dirname, '../../supabase/schema_full_v2.sql');
-        if (fs.existsSync(schemaPath)) {
-          let sql = fs.readFileSync(schemaPath, 'utf8');
-          
-          // Wenn pgvector fehlt, passen wir das Schema für Vektoren an (speichern als Text)
-          if (!hasPgVector) {
-            logger.info('[DB Init] Postgres: Passe Schema für Betrieb OHNE pgvector an...');
-            sql = sql.replace(/embedding\s+vector\(\d+\)/gi, 'embedding TEXT');
-          }
-
-          const statements = splitSqlStatements(sql);
-          for (const stmt of statements) {
-            // Überspringe Statements, die pgvector erfordern
-            if (!hasPgVector) {
-              if (stmt.toUpperCase().includes('USING IVFFLAT') || 
-                  stmt.toUpperCase().includes('FUNCTION MATCH_KNOWLEDGE')) {
-                logger.info(`[DB Init] Postgres: Überspringe pgvector-abhängiges Statement: ${stmt.substring(0, 50)}...`);
-                continue;
-              }
-            }
-
-            try {
-              await pool.query(stmt);
-            } catch (stmtErr) {
-              if (stmt.toUpperCase().includes('CREATE EXTENSION')) {
-                logger.warn(`[DB Init] Postgres: Extension-Erstellung ignoriert: ${stmtErr.message}`);
-              } else {
-                logger.error(`[DB Init] Postgres-Fehler bei SQL-Statement: ${stmt.substring(0, 150)}...`);
-                throw stmtErr;
-              }
-            }
-          }
-          logger.info('[DB Init] Postgres: Datenbank erfolgreich initialisiert.');
+      logger.info('[DB Init] Postgres: Führe Schema-Initialisierung aus...');
+      const schemaPath = path.join(__dirname, '../../supabase/schema_full_v2.sql');
+      if (fs.existsSync(schemaPath)) {
+        let sql = fs.readFileSync(schemaPath, 'utf8');
+        
+        // Wenn pgvector fehlt, passen wir das Schema für Vektoren an (speichern als Text)
+        if (!hasPgVector) {
+          logger.info('[DB Init] Postgres: Passe Schema für Betrieb OHNE pgvector an...');
+          sql = sql.replace(/embedding\s+vector\(\d+\)/gi, 'embedding TEXT');
         }
-      } else {
-        logger.info('[DB Init] Postgres: Bereits initialisiert.');
+
+        const statements = splitSqlStatements(sql);
+        for (const stmt of statements) {
+          // Überspringe Statements, die pgvector erfordern
+          if (!hasPgVector) {
+            if (stmt.toUpperCase().includes('USING IVFFLAT') || 
+                stmt.toUpperCase().includes('FUNCTION MATCH_KNOWLEDGE')) {
+              logger.info(`[DB Init] Postgres: Überspringe pgvector-abhängiges Statement: ${stmt.substring(0, 50)}...`);
+              continue;
+            }
+          }
+
+          try {
+            await pool.query(stmt);
+          } catch (stmtErr) {
+            if (stmt.toUpperCase().includes('CREATE EXTENSION')) {
+              logger.warn(`[DB Init] Postgres: Extension-Erstellung ignoriert: ${stmtErr.message}`);
+            } else {
+              logger.error(`[DB Init] Postgres-Fehler bei SQL-Statement: ${stmt.substring(0, 150)}...`);
+              throw stmtErr;
+            }
+          }
+        }
+        logger.info('[DB Init] Postgres: Schema-Initialisierung erfolgreich abgeschlossen.');
       }
     } catch (err) {
       logger.error(`[DB Init] Postgres-Fehler: ${err.message}`);
@@ -430,26 +423,20 @@ async function initializeDatabase() {
   } else {
     // SQLite Initialisierung
     return new Promise((resolve) => {
-      db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='settings';", async (err, row) => {
-        if (err) {
-          logger.error(`[DB Init] SQLite Check Error: ${err.message}`);
-          return resolve();
-        }
-        if (!row) {
-          logger.info('[DB Init] SQLite: Initialisiere Tabellen...');
-          const statements = splitSqlStatements(SQLITE_SCHEMA);
-          for (const stmt of statements) {
-            await new Promise((resStmt) => {
-              db.run(stmt, (stmtErr) => {
-                if (stmtErr) logger.error(`[DB Init] SQLite Statement Error: ${stmtErr.message} | SQL: ${stmt}`);
-                resStmt();
-              });
-            });
-          }
-          logger.info('[DB Init] SQLite: Datenbank erfolgreich initialisiert.');
-        } else {
-          logger.info('[DB Init] SQLite: Bereits initialisiert.');
-        }
+      logger.info('[DB Init] SQLite: Führe Schema-Initialisierung aus...');
+      const statements = splitSqlStatements(SQLITE_SCHEMA);
+      
+      const runPromises = statements.map(stmt => {
+        return new Promise((resStmt) => {
+          db.run(stmt, (stmtErr) => {
+            if (stmtErr) logger.error(`[DB Init] SQLite Statement Error: ${stmtErr.message} | SQL: ${stmt}`);
+            resStmt();
+          });
+        });
+      });
+
+      Promise.all(runPromises).then(() => {
+        logger.info('[DB Init] SQLite: Schema-Initialisierung abgeschlossen.');
         resolve();
       });
     });
