@@ -103,7 +103,7 @@ const messageProcessor = {
         }
         return orderReply;
       } else {
-        const errorReply = 'Das eingegebene Format scheint ungültig zu sein. Bitte sende mir eine gültige Bestellungs-ID (z. B. <code>8fdefaa78a695-0000013694549</code>) oder schreibe /cancel, um abzubrechen.';
+        const errorReply = 'Das eingegebene Format scheint ungültig zu sein. Bitte sende mir eine gültige Bestellungs-ID (z. B. <code>abcde12345-0000000000001</code>) oder schreibe /cancel, um abzubrechen.';
         void (async () => {
           try {
             await supabase.from('messages').insert([{ chat_id: chat.id, role: 'user', content: text }]);
@@ -130,7 +130,7 @@ const messageProcessor = {
         await supabase.from('chats').update({ metadata: updatedMetadata }).eq('id', chat.id);
       } catch (e) {}
 
-      const promptReply = 'Bitte sende mir deine Bestellungs-ID (z. B. <code>8fdefaa78a695-0000013694549</code>), damit ich den Status deiner Bestellung prüfen kann. (Schreibe /cancel, um abzubrechen).';
+      const promptReply = 'Bitte sende mir deine Bestellungs-ID (z. B. <code>abcde12345-0000000000001</code>), damit ich den Status deiner Bestellung prüfen kann. (Schreibe /cancel, um abzubrechen).';
       void (async () => {
         try { await supabase.from('messages').insert([{ chat_id: chat.id, role: 'assistant', content: promptReply }]); } catch (_) {}
       })();
