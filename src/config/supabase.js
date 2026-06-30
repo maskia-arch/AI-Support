@@ -16,6 +16,40 @@ pool.on('error', (err) => {
   logger.error(`[DB Pool Error] ${err.message}`);
 });
 
+// Hilfsfunktion zum Aufteilen eines SQL-Skripts in einzelne Anweisungen.
+// Beachtet $$-Blöcke (z. B. für PostgreSQL-Funktionen), damit Semicolons darin nicht fälschlich trennen.
+function splitSqlStatements(sql) {
+  const statements = [];
+  let current = '';
+  let inDollarQuote = false;
+  
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql[i];
+    const nextChar = sql[i + 1];
+    
+    if (char === '$' && nextChar === '$') {
+      inDollarQuote = !inDollarQuote;
+      current += '$$';
+      i++; // Überspringe das zweite '$'
+      continue;
+    }
+    
+    if (char === ';' && !inDollarQuote) {
+      statements.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) {
+    statements.push(current.trim());
+  }
+  return statements.filter(stmt => {
+    const cleaned = stmt.trim();
+    return cleaned.length > 0 && !cleaned.startsWith('--');
+  });
+}
+
 // Auto-Initialisierung des Datenbankschemas beim Start
 async function initializeDatabase() {
   try {
@@ -33,8 +67,22 @@ async function initializeDatabase() {
       const schemaPath = path.join(__dirname, '../../supabase/schema_full_v2.sql');
       if (fs.existsSync(schemaPath)) {
         const sql = fs.readFileSync(schemaPath, 'utf8');
-        await pool.query(sql);
-        logger.info('[DB Init] Datenbank erfolgreich mit schema_full_v2.sql initialisiert.');
+        const statements = splitSqlStatements(sql);
+        
+        for (const stmt of statements) {
+          try {
+            await pool.query(stmt);
+          } catch (stmtErr) {
+            // Falls CREATE EXTENSION fehlschlägt (z. B. weil die Rolle 'supabase_admin' fehlt oder keine Superuser-Rechte vorliegen),
+            // loggen wir eine Warnung, fahren aber fort, da Extensions auf Cloud-Plattformen wie Supabase meist schon aktiv sind.
+            if (stmt.toUpperCase().includes('CREATE EXTENSION')) {
+              logger.warn(`[DB Init] Warnung bei Extension-Erstellung (wird ignoriert): ${stmtErr.message}`);
+            } else {
+              throw stmtErr; // Kritischer Fehler bei Tabellen/Indizes -> abbrechen
+            }
+          }
+        }
+        logger.info('[DB Init] Datenbank erfolgreich initialisiert.');
       } else {
         logger.warn(`[DB Init] Schema-Datei nicht gefunden unter: ${schemaPath}`);
       }
