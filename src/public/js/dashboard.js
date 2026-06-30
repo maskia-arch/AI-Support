@@ -47,7 +47,7 @@ async function initDashboard() {
     // Vorher: 7 setTimeout-Stufen über 5+ Sekunden gestaffelt → User sah
     // leere Sections bis zum Tab-Wechsel oder Refresh.
     // Jetzt: Promise.allSettled feuert alle Endpoints sofort gleichzeitig.
-    // Render hat keine Probleme mit ~15 parallelen API-Calls.
+    // Coolify/VPS hat keine Probleme mit ~15 parallelen API-Calls.
     // (1.6.78) App-Type-Filter: Berater mode preload jobs.
     var appType = 'berater';
 
@@ -130,7 +130,7 @@ function _showLoadError() {
     if (app) app.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;color:#94a3b8;text-align:center;padding:2rem;">' +
         '<div style="font-size:2rem;">⚠️</div>' +
         '<div style="font-size:1rem;font-weight:600;">Dashboard konnte nicht laden</div>' +
-        '<div style="font-size:0.85rem;color:#64748b;">Server nicht erreichbar oder DB-Fehler.<br>Render-Logs prüfen.</div>' +
+        '<div style="font-size:0.85rem;color:#64748b;">Server nicht erreichbar oder DB-Fehler.<br>Coolify-Logs prüfen.</div>' +
         '<button onclick="window.location.reload()" class="btn btn-primary" style="margin-top:8px;">↺ Neu laden</button>' +
         '</div>';
 }
@@ -1787,7 +1787,7 @@ async function testSellauth() {
         var s = await api.getSettings();
         // API Key kommt aus ENV (nicht im Dashboard sichtbar) oder aus DB
         if (!s.sellauth_api_key && !s.sellauth_api_key_via_env) {
-            return alert('Sellauth nicht konfiguriert. Bitte SELLAUTH_API_KEY als Render Environment Variable setzen.');
+            return alert('Sellauth nicht konfiguriert. Bitte SELLAUTH_API_KEY als Coolify Environment Variable setzen.');
         }
         var r = await api.request('/sellauth/test', 'POST', {});
         if (r.ok) showToast('✅ Verbunden: ' + r.shopName);
@@ -1831,8 +1831,8 @@ async function loadSellauthConfigStatus() {
                 (c.shopUrl ? '<br><span style="color:#22c55e;font-size:0.82rem;">✅ Shop URL: ' + esc(c.shopUrl) + '</span>' : '<br><span style="color:#f59e0b;font-size:0.82rem;">⚠️ Shop URL: nicht gesetzt (Kauflinks fehlen)</span>');
         } else {
             var missing = (c.missing||[]).join(', ') || 'unbekannt';
-            statusEl.innerHTML = '<span style="color:#ef4444;font-size:0.82rem;">❌ Fehlende Render Env-Variablen: <b>' + esc(missing) + '</b></span>' +
-                '<br><span style="color:#94a3b8;font-size:0.78rem;">Render → Dein Service → Environment → Variable hinzufügen</span>';
+            statusEl.innerHTML = '<span style="color:#ef4444;font-size:0.82rem;">❌ Fehlende Coolify Env-Variablen: <b>' + esc(missing) + '</b></span>' +
+                '<br><span style="color:#94a3b8;font-size:0.78rem;">Coolify → Environment Variables → Variable hinzufügen</span>';
         }
     } catch(e) {
         statusEl.innerHTML = '<span style="color:#ef4444;font-size:0.82rem;">Config-Check fehlgeschlagen: ' + esc(e.message) + '</span>';
@@ -1883,7 +1883,7 @@ function _applySettings(s) {
             el.value = '';
             el.placeholder = '🔒 via ENV-Variable gesetzt';
             el.disabled = true;
-            el.title = 'Dieser Wert ist als Render Environment Variable gesetzt.';
+            el.title = 'Dieser Wert ist als Coolify Environment Variable gesetzt.';
         } else if (val != null) {
             el.value = val;
             el.disabled = false;
@@ -2295,7 +2295,7 @@ async function subscribePush() {
         // 2. VAPID Public Key vom Server laden
         var keyData = await api.request('/push/vapid-key');
         if (!keyData?.publicKey) {
-            alert('VAPID_PUBLIC_KEY fehlt in den Server-Einstellungen. Bitte in Render.com Environment Variables setzen.');
+            alert('VAPID_PUBLIC_KEY fehlt in den Server-Einstellungen. Bitte in den Coolify Environment Variables setzen.');
             return;
         }
 
@@ -2740,11 +2740,11 @@ async function loadVapidStatus() {
     try {
         var d = await api.request('/vapid/generate');
         if (d.isConfigured) {
-            el.innerHTML = '<span style="color:#22c55e;">✅ Push aktiv — VAPID-Keys sind in Render gesetzt</span>';
+            el.innerHTML = '<span style="color:#22c55e;">✅ Push aktiv — VAPID-Keys sind in Coolify gesetzt</span>';
         } else {
             el.innerHTML =
-                '<span style="color:#ef4444;">❌ Push deaktiviert — VAPID_PUBLIC_KEY und VAPID_PRIVATE_KEY fehlen in Render</span>' +
-                '<br><span style="color:#94a3b8;font-size:0.78rem;">Klicke "VAPID-Keys generieren" → Keys in Render Environment Variables eintragen → Redeploy</span>';
+                '<span style="color:#ef4444;">❌ Push deaktiviert — VAPID_PUBLIC_KEY und VAPID_PRIVATE_KEY fehlen in Coolify</span>' +
+                '<br><span style="color:#94a3b8;font-size:0.78rem;">Klicke "VAPID-Keys generieren" → Keys in Coolify Environment Variables eintragen → Redeploy</span>';
         }
     } catch(e) {
         el.innerHTML = '<span style="color:#64748b;">Status unbekannt: ' + esc(e.message) + '</span>';
@@ -2761,13 +2761,13 @@ async function generateVapidKeys() {
             return;
         }
         // Keys anzeigen zum Kopieren
-        var msg = '🔑 VAPID-Keys generiert!\n\nIn Render → Environment Variables eintragen:\n\n' +
+        var msg = '🔑 VAPID-Keys generiert!\n\nIn Coolify → Environment Variables eintragen:\n\n' +
             'VAPID_PUBLIC_KEY:\n' + d.publicKey + '\n\n' +
             'VAPID_PRIVATE_KEY:\n' + d.privateKey + '\n\n' +
-            'Danach: Render → Manual Deploy → Redeploy';
+            'Danach: Coolify → Redeploy';
         alert(msg);
         if (el) el.innerHTML =
-            '<span style="color:#f59e0b;">⚠️ Keys generiert – jetzt in Render eintragen und Redeploy</span>' +
+            '<span style="color:#f59e0b;">⚠️ Keys generiert – jetzt in Coolify eintragen und Redeploy</span>' +
             '<br><code style="font-size:0.7rem;color:#60a5fa;word-break:break-all;">PUBLIC: ' + esc(d.publicKey.substring(0,20)) + '…</code>';
     } catch(e) {
         if (el) el.innerHTML = '<span style="color:#ef4444;">Fehler: ' + esc(e.message) + '</span>';

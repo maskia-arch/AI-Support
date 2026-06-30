@@ -68,7 +68,7 @@ async function _doSubscribe(silent) {
         try { keyData = await _pushApi('/vapid/public-key'); }
         catch (e) { say('❌ VAPID-Key konnte nicht geladen werden: ' + e.message, '#ef4444'); return false; }
         if (!keyData || !keyData.configured || !keyData.publicKey) {
-            say('❌ VAPID-Keys nicht in Render gesetzt (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY).', '#ef4444');
+            say('❌ VAPID-Keys nicht in Coolify gesetzt (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY).', '#ef4444');
             return false;
         }
 

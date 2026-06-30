@@ -367,10 +367,10 @@ const adminController = {
           ? '✅ VAPID bereits konfiguriert – Push aktiv'
           : '❌ VAPID nicht gesetzt – Push deaktiviert',
         instructions: [
-          'Diese Keys EINMALIG generieren und in Render eintragen:',
+          'Diese Keys EINMALIG generieren und in Coolify eintragen:',
           `VAPID_PUBLIC_KEY = ${keys.publicKey}`,
           `VAPID_PRIVATE_KEY = ${keys.privateKey}`,
-          'Danach Render-Service neu starten → Push-Notifications aktiv'
+          'Danach App in Coolify neu starten (Redeploy) → Push-Notifications aktiv'
         ]
       });
     } catch (e) {
@@ -1043,8 +1043,8 @@ const adminController = {
       } catch (_) {}
       const { apiKey, shopId, shopUrl } = getEffectiveSellauth(dbSettings);
       res.json({
-        apiKey:  apiKey  ? `✅ gesetzt (${apiKey.substring(0,6)}…)`  : '❌ fehlt → SELLAUTH_API_KEY in Render setzen',
-        shopId:  shopId  ? `✅ ${shopId}`                            : '❌ fehlt → SELLAUTH_SHOP_ID in Render setzen',
+        apiKey:  apiKey  ? `✅ gesetzt (${apiKey.substring(0,6)}…)`  : '❌ fehlt → SELLAUTH_API_KEY in Coolify setzen',
+        shopId:  shopId  ? `✅ ${shopId}`                            : '❌ fehlt → SELLAUTH_SHOP_ID in Coolify setzen',
         shopUrl: shopUrl ? `✅ ${shopUrl}`                           : '⚠️ nicht gesetzt (optional, für Kauflinks)',
         ready:   !!(apiKey && shopId),
         source: {
@@ -1074,9 +1074,9 @@ const adminController = {
       if (!shopId) missing.push('SELLAUTH_SHOP_ID');
       if (missing.length > 0) {
         return res.status(400).json({
-          error: `Fehlende Env-Variablen in Render: ${missing.join(', ')}`,
+          error: `Fehlende Env-Variablen in Coolify: ${missing.join(', ')}`,
           missing,
-          hint: 'Render → Dein Service → Environment → Add Environment Variable'
+          hint: 'Coolify → Environment Variables'
         });
       }
 
@@ -1116,7 +1116,7 @@ const adminController = {
       if (missing.length > 0) return res.status(400).json({
         error: `Fehlende Env-Variablen: ${missing.join(', ')}`,
         missing,
-        hint: 'Render → Dein Service → Environment → Add Environment Variable'
+        hint: 'Coolify → Environment Variables'
       });
       const products = await sellauthService.getAllProducts(apiKey, shopId);
       res.json({

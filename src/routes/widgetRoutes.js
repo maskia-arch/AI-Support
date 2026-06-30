@@ -16,7 +16,7 @@ router.use((req, res, next) => {
 
 // (1.6.78) Diagnose-Endpoint - der User kann von seiner Website aus pruefen
 // ob das Widget-Backend lebt.
-// Nutzung: window.fetch('https://ai-agent-lix6.onrender.com/api/widget/health').then(r=>r.json()).then(console.log)
+// Nutzung: window.fetch('https://aisupport.autoacts.link/api/widget/health').then(r=>r.json()).then(console.log)
 router.get('/health', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({

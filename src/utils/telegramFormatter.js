@@ -291,7 +291,7 @@ function entitiesToHtml(text, entities) {
 
 /**
  * Formatiert einen ISO-/Date-Wert als deutsche Datums-Zeit-Anzeige in MEZ/MESZ.
- * Render läuft in UTC → wir erzwingen die Berliner Zeitzone für die Anzeige.
+ * Der Server/VPS läuft meist in UTC → wir erzwingen die Berliner Zeitzone für die Anzeige.
  * @param {string|Date|number} value  ISO-String, Date oder Timestamp
  * @returns {string} z.B. "31.12.2026, 23:59 Uhr" oder "" bei ungültigem Wert
  */

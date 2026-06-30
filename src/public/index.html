@@ -284,7 +284,7 @@
             <h2 class="section-title">🛒 Sellauth</h2>
             <div class="card" style="margin-bottom:12px;">
                 <p style="color:#888;font-size:0.85rem;margin-bottom:8px;">
-                    Sellauth ist über Render Environment Variables konfiguriert:
+                    Sellauth ist über Coolify Environment Variables konfiguriert:
                 </p>
                 <div id="sellauth-config-status" style="margin-bottom:12px;padding:8px 10px;background:#0f172a;border-radius:6px;line-height:1.7;">
                     <span style="color:#64748b;font-size:0.82rem;">⏳ Prüfe Konfiguration…</span>
@@ -361,10 +361,6 @@
                     </div>
                     <button onclick="saveSettings()" class="btn btn-success btn-full">💾 Speichern</button>
                 </div>
-                <div class="card" style="border-color:#1e3a5f;">
-                    <h3 class="card-title">🔔 Push-Benachrichtigungen</h3>
-                    <div id="push-status"><p style="color:#666;font-size:0.875rem;">Wird geladen...</p></div>
-                </div>
             </div>
 
             <div id="settings-tab-model" class="tab-pane">
@@ -429,7 +425,7 @@
                         <button id="enable-push" class="btn btn-primary btn-sm">🔔 Push aktivieren</button>
                         <button onclick="sendTestPush()" class="btn btn-secondary btn-sm">📨 Test senden</button>
                     </div>
-                    <p class="hint" style="margin-top:6px;">Push-Benachrichtigungen bei neuen Website-Besuchern und Chat-Nachrichten. VAPID-Keys einmalig generieren → in Render Environment Variables eintragen → Push aktivieren.</p>
+                    <p class="hint" style="margin-top:6px;">Push-Benachrichtigungen bei neuen Website-Besuchern und Chat-Nachrichten. VAPID-Keys einmalig generieren → in Coolify Environment Variables eintragen → Push aktivieren.</p>
                     <p class="hint" style="margin-top:4px;color:#f59e0b;">📱 iOS: Push funktioniert nur wenn das Dashboard über Safari → "Zum Home-Bildschirm" als App installiert wurde.</p>
                     <div id="push-step-status" style="display:none;margin-top:8px;padding:8px 10px;background:#0f172a;border-radius:6px;font-size:0.82rem;"></div>
                 </div>

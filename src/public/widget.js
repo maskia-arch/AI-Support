@@ -49,7 +49,7 @@ function _postTrack(path, body, tries){
   }
 }
 
-var API=(function(){var s=document.querySelectorAll('script[src*="widget.js"]');return s.length?s[s.length-1].src.replace('/widget.js',''):'https://ai-agent-lix6.onrender.com';})();
+var API=(function(){var s=document.querySelectorAll('script[src*="widget.js"]');return s.length?s[s.length-1].src.replace('/widget.js',''):'https://aisupport.autoacts.link';})();
 var chatId=null,isOpen=false,isTyping=false,_proDone=false,_handover=false,_faqUsed=false,_proTimer=null,_statusInt=null,_lastMsgTs=0;
 
 var STORAGE_KEY='vs25_cid';
