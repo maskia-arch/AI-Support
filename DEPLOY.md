@@ -3,7 +3,7 @@
 ## 1. Voraussetzungen
 
 - **Cloudzy VPS** mit installiertem **Coolify** (selbst gehostet).
-- Ein **GitHub-Repository** mit dem Code des eSIM-Beraters.
+- Ein **GitHub-Repository** mit dem Code des eSIM-Beraters (inklusive der im Hauptverzeichnis liegenden `Dockerfile`).
 - Eine lauffähige **PostgreSQL-Instanz** in Coolify (mit `pgvector` Support).
 
 ---
