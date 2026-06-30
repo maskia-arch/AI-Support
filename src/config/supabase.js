@@ -422,23 +422,20 @@ async function initializeDatabase() {
     }
   } else {
     // SQLite Initialisierung
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       logger.info('[DB Init] SQLite: Führe Schema-Initialisierung aus...');
       const statements = splitSqlStatements(SQLITE_SCHEMA);
       
-      const runPromises = statements.map(stmt => {
-        return new Promise((resStmt) => {
+      for (const stmt of statements) {
+        await new Promise((resStmt) => {
           db.run(stmt, (stmtErr) => {
             if (stmtErr) logger.error(`[DB Init] SQLite Statement Error: ${stmtErr.message} | SQL: ${stmt}`);
             resStmt();
           });
         });
-      });
-
-      Promise.all(runPromises).then(() => {
-        logger.info('[DB Init] SQLite: Schema-Initialisierung abgeschlossen.');
-        resolve();
-      });
+      }
+      logger.info('[DB Init] SQLite: Schema-Initialisierung abgeschlossen.');
+      resolve();
     });
   }
 }
@@ -516,6 +513,9 @@ class QueryBuilder {
   }
 
   select(fields = '*', options = {}) {
+    if (this.op === 'insert' || this.op === 'update' || this.op === 'upsert' || this.op === 'delete') {
+      return this;
+    }
     this.op = 'select';
     this.selectFields = fields || '*';
     this.countOption = options.count || null;
