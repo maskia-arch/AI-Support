@@ -81,11 +81,18 @@ async function autoRegisterWebhook() {
       appUrl = settings?.webhook_url || '';
     } catch (e) {}
   }
-  if (!appUrl) { logger.warn('[Webhook] APP_URL nicht gesetzt.'); return; }
-  appUrl = appUrl.replace(/\/$/, '');
 
   const supportToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (supportToken) {
+  if (!supportToken) {
+    logger.warn('[Webhook/Support] TELEGRAM_BOT_TOKEN nicht gesetzt.');
+    return;
+  }
+
+  // Telegram verlangt zwingend HTTPS für Webhooks
+  const isHttps = appUrl && appUrl.toLowerCase().startsWith('https://');
+
+  if (isHttps) {
+    appUrl = appUrl.replace(/\/$/, '');
     try {
       const r = await axios.post(
         `https://api.telegram.org/bot${supportToken}/setWebhook`,
@@ -99,9 +106,27 @@ async function autoRegisterWebhook() {
       if (r.data?.ok) {
         logger.info(`[Webhook/Support] ✅ Registriert: ${appUrl}/api/webhooks/telegram`);
         try { await supabase.from('settings').upsert({ id: 1, webhook_url: appUrl, updated_at: new Date() }); } catch(_){}
-      } else logger.warn(`[Webhook/Support] Fehler: ${r.data?.description}`);
-    } catch (e) { logger.warn(`[Webhook/Support] ${e.response?.data?.description || e.message}`); }
-  } else logger.warn('[Webhook/Support] TELEGRAM_BOT_TOKEN nicht gesetzt.');
+        return; // Webhook registriert, fertig!
+      } else {
+        logger.warn(`[Webhook/Support] Fehler: ${r.data?.description}`);
+      }
+    } catch (e) {
+      logger.warn(`[Webhook/Support] Registrierung fehlgeschlagen: ${e.response?.data?.description || e.message}`);
+    }
+  } else {
+    logger.warn('[Webhook/Support] Keine HTTPS-URL konfiguriert (Telegram verlangt HTTPS).');
+  }
+
+  // Fallback: Webhook löschen und Long-Polling starten
+  try {
+    logger.info('[Webhook/Support] Entferne alten Webhook bei Telegram...');
+    await axios.post(`https://api.telegram.org/bot${supportToken}/deleteWebhook`);
+    
+    const webhookRoutesModule = require('./routes/webhookRoutes');
+    webhookRoutesModule.startTelegramPolling(supportToken);
+  } catch (err) {
+    logger.error(`[Webhook/Support] Fehler beim Umschalten auf Polling: ${err.message}`);
+  }
 }
 
 async function setAutoCommands() {

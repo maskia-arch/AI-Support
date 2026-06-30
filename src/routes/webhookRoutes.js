@@ -12,8 +12,10 @@
  */
 const express          = require('express');
 const router           = express.Router();
+const axios            = require('axios');
 const supabase         = require('../config/supabase');
 const telegramService  = require('../services/telegramService');
+const logger           = require('../utils/logger');
 
 // ── Deduplizierung: verhindert Doppelverarbeitung bei Telegram-Retries ────────
 const _processedUpdates = new Map();
@@ -29,127 +31,189 @@ function _rememberUpdate(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Gemeinsame Verarbeitungslogik für Telegram-Updates (Webhook & Polling)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleTelegramUpdate(updateBody) {
+  try {
+    const SUPPORT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    if (!SUPPORT_TOKEN) {
+      logger.error('[Telegram/Support] TELEGRAM_BOT_TOKEN nicht konfiguriert!');
+      return;
+    }
+
+    // ── Deduplizierung ──────────────────────────────────────────────────────
+    const update_id = updateBody?.update_id;
+    if (update_id && _processedUpdates.has(update_id)) return;
+    if (update_id) _rememberUpdate(update_id);
+
+    // ── Nur echte Nachrichten verarbeiten ───────────────────────────────────
+    const msg = updateBody.message;
+    if (!msg) return; // callback_query, channel_post, my_chat_member etc. ignorieren
+
+    const chatId   = msg.chat?.id?.toString();
+    const text     = msg.text?.trim() || msg.caption?.trim() || '';
+    const from     = msg.from;
+    const isPrivate = msg.chat?.type === 'private';
+
+    // Scope: nur PrivatChat — Gruppen/Kanäle gehören einem separaten Service
+    if (!isPrivate) return;
+
+    if (!chatId || !text || !from) return;
+
+    // Bots ignorieren
+    if (from.is_bot) return;
+
+    // ── Einstellungen laden (Welcome-Message) ───────────────────────────────
+    let settings = null;
+    try {
+      const { data } = await supabase.from('settings').select('welcome_message').single();
+      settings = data;
+    } catch (_) {}
+
+    const tgSend = (text, extra = {}) =>
+      telegramService.sendMessage(chatId, text, { token: SUPPORT_TOKEN, ...extra });
+
+    // ── /start ──────────────────────────────────────────────────────────────
+    if (text === '/start' || text.startsWith('/start@')) {
+      const welcome = settings?.welcome_message
+        || 'Willkommen beim ValueShop25 Support! 👋\n\nIch helfe dir bei Fragen rund um eSIMs und unsere Tarife. Frag mich einfach!\n\n📋 Bestellung prüfen: /order DEINE_INVOICE_ID';
+      await tgSend(welcome);
+      return;
+    }
+
+    // ── /help ───────────────────────────────────────────────────────────────
+    if (text === '/help' || text.startsWith('/help@')) {
+      const helpText =
+        '📚 <b>So kann ich dir helfen:</b>\n\n' +
+        '• Stelle mir Fragen zu unseren eSIM-Tarifen\n' +
+        '• Frage nach passenden Ländern oder Datenvolumen\n' +
+        '• Frage nach aktuellen Coupons & Aktionen\n\n' +
+        '<b>/order</b> &lt;Invoice-ID&gt; — Bestellstatus prüfen\n' +
+        '<b>/start</b> — Begrüßung\n\n' +
+        'Bei komplexen Anliegen: @autoacts';
+      await tgSend(helpText);
+      return;
+    }
+
+    // ── /order <InvoiceId> ──────────────────────────────────────────────────
+    const ID_PATTERN = '([a-f0-9]+-[0-9]+|[0-9]+)';
+    const orderMatch =
+      text.match(new RegExp('^\\/order\\s+' + ID_PATTERN, 'i')) ||
+      text.match(new RegExp('(?:bestellung|invoice|order|rechnung)[:\\s#]+' + ID_PATTERN, 'i'));
+
+    if (orderMatch) {
+      const invoiceId = orderMatch[1];
+      try {
+        const sellauthService = require('../services/sellauthService');
+        let sData = null;
+        try {
+          const { data } = await supabase
+            .from('settings')
+            .select('sellauth_api_key, sellauth_shop_id, sellauth_shop_url')
+            .single();
+          sData = data;
+        } catch (_) {}
+        const saApiKey  = process.env.SELLAUTH_API_KEY  || sData?.sellauth_api_key  || '';
+        const saShopId  = process.env.SELLAUTH_SHOP_ID  || sData?.sellauth_shop_id  || '';
+        const saShopUrl = process.env.SELLAUTH_SHOP_URL || sData?.sellauth_shop_url || '';
+
+        if (!saApiKey) {
+          await tgSend('Bestellabfrage derzeit nicht verfügbar.');
+          return;
+        }
+        const invoice  = await sellauthService.getInvoice(saApiKey, saShopId, invoiceId);
+        const response = sellauthService.formatInvoiceForCustomer(invoice, saShopUrl);
+        await tgSend(response);
+      } catch (_) {
+        await tgSend('Bestellung nicht gefunden. Bitte prüfe die Invoice-ID aus deiner Bestätigungs-E-Mail.');
+      }
+      return;
+    }
+
+    // ── Alle anderen Nachrichten → AI ───────────────────────────────────────
+    telegramService.sendTypingAction(chatId, { token: SUPPORT_TOKEN }).catch(() => {});
+
+    const messageProcessor = require('../services/messageProcessor');
+    await messageProcessor.handle({
+      platform: 'telegram',
+      chatId,
+      text,
+      metadata: {
+        username:   from.username  || null,
+        first_name: from.first_name || 'Nutzer',
+        token:      SUPPORT_TOKEN
+      }
+    });
+
+  } catch (err) {
+    logger.error(`[Telegram/Support] Fehler bei Update-Verarbeitung: ${err.message}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Long-Polling Implementierung (Fallback bei fehlendem HTTPS / Webhook-Fehler)
+// ─────────────────────────────────────────────────────────────────────────────
+let isPolling = false;
+let pollingTimer = null;
+
+function startTelegramPolling(token) {
+  if (isPolling) return;
+  isPolling = true;
+  logger.info('[Telegram Polling] 🔄 Starte Telegram Long-Polling...');
+
+  let offset = 0;
+
+  async function poll() {
+    if (!isPolling) return;
+    try {
+      const response = await axios.get(`https://api.telegram.org/bot${token}/getUpdates`, {
+        params: {
+          offset: offset,
+          timeout: 30,
+          allowed_updates: JSON.stringify(['message'])
+        },
+        timeout: 35000 // Etwas länger als das Telegram-Timeout
+      });
+
+      const updates = response.data?.result || [];
+      for (const update of updates) {
+        offset = update.update_id + 1;
+        // Asynchrone Ausführung des Handlers
+        handleTelegramUpdate(update).catch(err => {
+          logger.error(`[Telegram Polling] Handler-Fehler: ${err.message}`);
+        });
+      }
+    } catch (err) {
+      // ECONNABORTED und ETIMEDOUT sind normale Timeouts der Long-Poll-Anfrage
+      if (err.code !== 'ECONNABORTED' && err.code !== 'ETIMEDOUT') {
+        logger.error(`[Telegram Polling] Fehler beim Abrufen der Updates: ${err.message}`);
+        // Bei echten Fehlern kurz warten, um Log-Spamming zu vermeiden
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+
+    if (isPolling) {
+      setImmediate(poll);
+    }
+  }
+
+  poll();
+}
+
+function stopTelegramPolling() {
+  if (isPolling) {
+    isPolling = false;
+    logger.info('[Telegram Polling] ⏹️ Polling gestoppt.');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/webhooks/telegram
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/telegram', (req, res) => {
-  // Sofort 200 — verhindert Telegram-Retries bei Verarbeitungszeit > 5s
   res.sendStatus(200);
-
   setImmediate(async () => {
-    try {
-      const SUPPORT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-      if (!SUPPORT_TOKEN) {
-        console.error('[Webhook/Support] TELEGRAM_BOT_TOKEN nicht konfiguriert!');
-        return;
-      }
-
-      // ── Deduplizierung ──────────────────────────────────────────────────────
-      const update_id = req.body?.update_id;
-      if (update_id && _processedUpdates.has(update_id)) return;
-      if (update_id) _rememberUpdate(update_id);
-
-      // ── Nur echte Nachrichten verarbeiten ───────────────────────────────────
-      const msg = req.body.message;
-      if (!msg) return; // callback_query, channel_post, my_chat_member etc. ignorieren
-
-      const chatId   = msg.chat?.id?.toString();
-      const text     = msg.text?.trim() || msg.caption?.trim() || '';
-      const from     = msg.from;
-      const isPrivate = msg.chat?.type === 'private';
-
-      // Scope: nur PrivatChat — Gruppen/Kanäle gehören einem separaten Service
-      if (!isPrivate) return;
-
-      if (!chatId || !text || !from) return;
-
-      // Bots ignorieren
-      if (from.is_bot) return;
-
-      // ── Einstellungen laden (Welcome-Message) ───────────────────────────────
-      let settings = null;
-      try {
-        const { data } = await supabase.from('settings').select('welcome_message').single();
-        settings = data;
-      } catch (_) {}
-
-      const tgSend = (text, extra = {}) =>
-        telegramService.sendMessage(chatId, text, { token: SUPPORT_TOKEN, ...extra });
-
-      // ── /start ──────────────────────────────────────────────────────────────
-      if (text === '/start' || text.startsWith('/start@')) {
-        const welcome = settings?.welcome_message
-          || 'Willkommen beim ValueShop25 Support! 👋\n\nIch helfe dir bei Fragen rund um eSIMs und unsere Tarife. Frag mich einfach!\n\n📋 Bestellung prüfen: /order DEINE_INVOICE_ID';
-        await tgSend(welcome);
-        return;
-      }
-
-      // ── /help ───────────────────────────────────────────────────────────────
-      if (text === '/help' || text.startsWith('/help@')) {
-        const helpText =
-          '📚 <b>So kann ich dir helfen:</b>\n\n' +
-          '• Stelle mir Fragen zu unseren eSIM-Tarifen\n' +
-          '• Frage nach passenden Ländern oder Datenvolumen\n' +
-          '• Frage nach aktuellen Coupons & Aktionen\n\n' +
-          '<b>/order</b> &lt;Invoice-ID&gt; — Bestellstatus prüfen\n' +
-          '<b>/start</b> — Begrüßung\n\n' +
-          'Bei komplexen Anliegen: @autoacts';
-        await tgSend(helpText);
-        return;
-      }
-
-      // ── /order <InvoiceId> ──────────────────────────────────────────────────
-      const ID_PATTERN = '([a-f0-9]+-[0-9]+|[0-9]+)';
-      const orderMatch =
-        text.match(new RegExp('^\\/order\\s+' + ID_PATTERN, 'i')) ||
-        text.match(new RegExp('(?:bestellung|invoice|order|rechnung)[:\\s#]+' + ID_PATTERN, 'i'));
-
-      if (orderMatch) {
-        const invoiceId = orderMatch[1];
-        try {
-          const sellauthService = require('../services/sellauthService');
-          let sData = null;
-          try {
-            const { data } = await supabase
-              .from('settings')
-              .select('sellauth_api_key, sellauth_shop_id, sellauth_shop_url')
-              .single();
-            sData = data;
-          } catch (_) {}
-          const saApiKey  = process.env.SELLAUTH_API_KEY  || sData?.sellauth_api_key  || '';
-          const saShopId  = process.env.SELLAUTH_SHOP_ID  || sData?.sellauth_shop_id  || '';
-          const saShopUrl = process.env.SELLAUTH_SHOP_URL || sData?.sellauth_shop_url || '';
-
-          if (!saApiKey) {
-            await tgSend('Bestellabfrage derzeit nicht verfügbar.');
-            return;
-          }
-          const invoice  = await sellauthService.getInvoice(saApiKey, saShopId, invoiceId);
-          const response = sellauthService.formatInvoiceForCustomer(invoice, saShopUrl);
-          await tgSend(response);
-        } catch (_) {
-          await tgSend('Bestellung nicht gefunden. Bitte prüfe die Invoice-ID aus deiner Bestätigungs-E-Mail.');
-        }
-        return;
-      }
-
-      // ── Alle anderen Nachrichten → AI ───────────────────────────────────────
-      telegramService.sendTypingAction(chatId, { token: SUPPORT_TOKEN }).catch(() => {});
-
-      const messageProcessor = require('../services/messageProcessor');
-      await messageProcessor.handle({
-        platform: 'telegram',
-        chatId,
-        text,
-        metadata: {
-          username:   from.username  || null,
-          first_name: from.first_name || 'Nutzer',
-          token:      SUPPORT_TOKEN
-        }
-      });
-
-    } catch (err) {
-      console.error('[Webhook/Support] Unhandled:', err.message);
-    }
+    await handleTelegramUpdate(req.body);
   });
 });
 
@@ -170,5 +234,10 @@ router.post('/sellauth', (req, res) => {
     } catch (_) {}
   });
 });
+
+// Zuweisen der Polling-Steuerung an den Router-Export (Abwärtskompatibel)
+router.handleTelegramUpdate = handleTelegramUpdate;
+router.startTelegramPolling = startTelegramPolling;
+router.stopTelegramPolling = stopTelegramPolling;
 
 module.exports = router;
